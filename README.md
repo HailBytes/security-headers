@@ -1,24 +1,16 @@
 # @hailbytes/security-headers
 
-> Analyze HTTP security headers for your web application. Get an A-F grade, per-header findings, and one-line remediation as a library, CLI, or CI gate.
+> Analyze HTTP security headers for your web application. Get an A–F grade, per-header findings, and one-line remediation — as a library, CLI, or CI gate.
+
+[![npm version](https://img.shields.io/npm/v/%40hailbytes%2Fsecurity-headers.svg)](https://www.npmjs.com/package/@hailbytes/security-headers)
+[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
+[![Bundle Size](https://img.shields.io/bundlephobia/minzip/%40hailbytes%2Fsecurity-headers)](https://bundlephobia.com/package/@hailbytes/security-headers)
 
 ---
 
-## What It Does
+## What it does
 
-Fetches (or accepts raw header objects) and grades **7 security header categories**:
-
-| Category | Header |
-|---|---|
-| HSTS | Strict-Transport-Security |
-| CSP | Content-Security-Policy |
-| Clickjacking | X-Frame-Options / frame-ancestors |
-| MIME Sniffing | X-Content-Type-Options |
-| Referrer Leakage | Referrer-Policy |
-| Browser Features | Permissions-Policy |
-| Cross-Origin Isolation | COEP / COOP / CORP |
-
-Returns an **A+ to F grade**, per-header scores, findings, and one-line remediation steps.
+Fetches (or accepts raw header objects) and grades 7 security header categories — HSTS, CSP, X-Frame-Options, X-Content-Type-Options, Referrer-Policy, Permissions-Policy, and Cross-Origin policies. Returns an A+ to F letter grade, a 0–100 percentage score, per-header findings, and specific remediation steps.
 
 ---
 
@@ -26,11 +18,7 @@ Returns an **A+ to F grade**, per-header scores, findings, and one-line remediat
 
 ```bash
 npm install @hailbytes/security-headers
-```
-
-Or use without installing:
-
-```bash
+# or run directly
 npx @hailbytes/security-headers https://example.com
 ```
 
@@ -41,43 +29,46 @@ npx @hailbytes/security-headers https://example.com
 ### CLI
 
 ```bash
-# Scan a URL
+# Scan a URL and print a color report
 npx @hailbytes/security-headers https://example.com
 
-# JSON output
+# Output raw JSON
 npx @hailbytes/security-headers https://example.com --json
 
-# CI gate -- fail if grade is D or F
-npx @hailbytes/security-headers https://example.com || echo 'fail'
+# Use as a CI gate (exits 1 on grade D or F)
+npx @hailbytes/security-headers https://staging.example.com || echo "Security headers gate failed"
 ```
 
-### Library -- Analyze a URL
+### Library — analyze a URL
 
-```typescript
-import { analyze } from "@hailbytes/security-headers";
+```ts
+import { analyze } from '@hailbytes/security-headers';
 
-const report = await analyze("https://example.com");
-console.log(report.grade);
-console.log(report.score);
+const report = await analyze('https://example.com');
+
+console.log(report.grade);       // 'A+' | 'A' | 'B' | 'C' | 'D' | 'F'
+console.log(report.score);       // 0–100
+console.log(report.percentage);  // 0–100
+console.log(report.headers);     // HeaderFinding[]
 ```
 
-### Library -- Analyze static header object
+### Library — analyze raw headers (offline / in tests)
 
-```typescript
-import { analyzeHeaders } from "@hailbytes/security-headers";
+```ts
+import { analyzeHeaders } from '@hailbytes/security-headers';
 
 const report = analyzeHeaders({
-  "strict-transport-security": "max-age=31536000; includeSubDomains; preload",
-  "content-security-policy": "default-src 'self'",
-  "x-frame-options": "DENY",
-  "x-content-type-options": "nosniff",
-  "referrer-policy": "strict-origin-when-cross-origin",
-  "permissions-policy": "camera=(), microphone=(), geolocation=()",
+  'strict-transport-security': 'max-age=31536000; includeSubDomains',
+  'content-security-policy': "default-src 'self'",
+  'x-frame-options': 'DENY',
+  'x-content-type-options': 'nosniff',
+  'referrer-policy': 'strict-origin-when-cross-origin',
 });
 
+console.log(report.grade); // 'B' or higher
 for (const h of report.headers) {
-  for (const rec of h.recommendations) {
-    console.log("Fix: " + rec);
+  if (h.status !== 'good') {
+    console.log(h.header, h.recommendations);
   }
 }
 ```
@@ -86,25 +77,25 @@ for (const h of report.headers) {
 
 ## Report Shape
 
-```typescript
+```ts
 interface SecurityHeaderReport {
   url?: string;
-  grade: "A+" | "A" | "B" | "C" | "D" | "F";
+  grade: 'A+' | 'A' | 'B' | 'C' | 'D' | 'F';
   score: number;
   maxScore: number;
-  percentage: number;
-  headers: HeaderFinding[];
-  analyzedAt: string;
+  percentage: number;       // 0–100
+  headers: HeaderFinding[]; // one per checked header
+  analyzedAt: string;       // ISO 8601 timestamp
 }
 
 interface HeaderFinding {
-  header: string;
-  score: number;
-  maxScore: number;
-  status: "good" | "warning" | "missing" | "error";
-  raw?: string;
-  findings: string[];
-  recommendations: string[];
+  header: string;           // header name
+  score: number;            // points earned
+  maxScore: number;         // max available
+  status: 'good' | 'warning' | 'missing' | 'error';
+  raw?: string;             // raw header value
+  findings: string[];       // what is wrong
+  recommendations: string[]; // how to fix it
 }
 ```
 
@@ -114,29 +105,41 @@ interface HeaderFinding {
 
 | Grade | Score |
 |---|---|
-| A+ | >= 90% |
-| A  | >= 75% |
-| B  | >= 60% |
-| C  | >= 40% |
-| D  | >= 20% |
-| F  | < 20%  |
+| A+ | ≥ 90% |
+| A | ≥ 75% |
+| B | ≥ 60% |
+| C | ≥ 40% |
+| D | ≥ 20% |
+| F | < 20% |
 
 ---
 
-## Who Is This For?
+## Headers Checked
 
-- **Security Engineers** running header audits across a fleet of apps
-- **DevSecOps** integrating header checks into CI/CD pipelines
-- **ASM Platform** integrations that need programmatic header scoring
+| Header | Max Points | Key Checks |
+|---|---|---|
+| Strict-Transport-Security | 20 | max-age ≥ 1 year, includeSubDomains, preload |
+| Content-Security-Policy | 30 | presence, no unsafe-inline/eval, no wildcards |
+| X-Frame-Options | 15 | DENY or SAMEORIGIN (or CSP frame-ancestors) |
+| X-Content-Type-Options | 10 | nosniff |
+| Referrer-Policy | 10 | strict values only |
+| Permissions-Policy | 10 | presence |
+| Cross-Origin Policies | 5 | COEP, COOP, CORP |
+
+---
+
+## Who Is This For
+
+Security engineers, DevSecOps teams, and ASM platform integrations that need automated header auditing on every deployment, pentesters who run this against every target scope, and developers who want to verify their app's security posture without leaving the terminal.
 
 ---
 
 ## See Also
 
-- [@hailbytes/asm-scope-parser](https://npmjs.com/package/@hailbytes/asm-scope-parser) -- Parse and validate ASM scope definitions
-- [@hailbytes/mcp-security-scanner](https://npmjs.com/package/@hailbytes/mcp-security-scanner) -- MCP-compatible security scanner
-- [HailBytes ASM Platform](https://hailbytes.com/asm) -- Attack Surface Management
+- [`@hailbytes/asm-scope-parser`](https://github.com/HailBytes/asm-scope-parser) — Parse and normalize attack surface scope definitions
+- [`@hailbytes/mcp-security-scanner`](https://github.com/HailBytes/mcp-security-scanner) — Security scanner for MCP server configurations
+- [HailBytes ASM](https://hailbytes.com/asm) — Attack Surface Management platform
 
 ---
 
-Made with love by [HailBytes](https://hailbytes.com)
+*Part of the [HailBytes](https://hailbytes.com) open-source security toolkit.*
