@@ -1,0 +1,43 @@
+name: CI + Auto Tag
+
+on:
+  push:
+    branches: [main]
+
+jobs:
+  ci-and-tag:
+    name: Test & Tag
+    runs-on: ubuntu-latest
+    if: "!contains(github.event.head_commit.message, '[skip ci]')"
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Test
+        run: npm test
+
+      - name: Tag HEAD with next patch version
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+
+          # Determine next version from latest git tag (fallback to package.json)
+          LATEST=$(git tag -l 'v*' --sort=-version:refname | head -1)
+          if [ -z "$LATEST" ]; then
+            LATEST="v$(node -p "require('./package.json').version")"
+          fi
+          CURRENT="${LATEST#v}"
+          IFS='.' read -r MAJOR MINOR PATCH <<< "$CURRENT"
+          NEW_VERSION="$MAJOR.$MINOR.$((PATCH + 1))"
+
+          git tag "v$NEW_VERSION"
+          git push origin "v$NEW_VERSION"
+          echo "Tagged HEAD as v$NEW_VERSION"
