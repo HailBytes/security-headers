@@ -3,6 +3,7 @@
 > Analyze HTTP security headers for your web application. Get an A–F grade, per-header findings, and one-line remediation — as a library, CLI, or CI gate.
 
 [![npm version](https://img.shields.io/npm/v/%40hailbytes%2Fsecurity-headers.svg)](https://www.npmjs.com/package/@hailbytes/security-headers)
+[![npm downloads](https://img.shields.io/npm/dw/%40hailbytes%2Fsecurity-headers.svg)](https://www.npmjs.com/package/@hailbytes/security-headers)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 [![Bundle Size](https://img.shields.io/bundlephobia/minzip/%40hailbytes%2Fsecurity-headers)](https://bundlephobia.com/package/@hailbytes/security-headers)
 
