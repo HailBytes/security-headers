@@ -1,0 +1,66 @@
+{
+  "name": "@hailbytes/security-headers",
+  "version": "1.0.1",
+  "description": "Analyze HTTP security headers for your web application. A-F grading, per-header findings, and remediation steps — as a library or CLI.",
+  "type": "module",
+  "license": "MIT",
+  "author": "HailBytes, LLC",
+  "keywords": [
+    "security-headers",
+    "http-security",
+    "csp",
+    "hsts",
+    "content-security-policy",
+    "x-frame-options",
+    "security-audit",
+    "cybersecurity",
+    "hailbytes",
+    "web-security"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/HailBytes/security-headers.git"
+  },
+  "bugs": {
+    "url": "https://github.com/HailBytes/security-headers/issues"
+  },
+  "homepage": "https://hailbytes.com/asm",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "import": "./dist/index.js",
+      "types": "./dist/index.d.ts"
+    }
+  },
+  "bin": {
+    "security-headers": "./dist/cli.js"
+  },
+  "files": [
+    "dist",
+    "README.md",
+    "LICENSE",
+    "CHANGELOG.md"
+  ],
+  "scripts": {
+    "build": "tsc -p tsconfig.build.json",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "test:coverage": "vitest run --coverage",
+    "prepublishOnly": "npm run build"
+  },
+  "devDependencies": {
+    "@types/node": "^20.0.0",
+    "@vitest/coverage-v8": "^1.6.0",
+    "typescript": "^5.4.0",
+    "vitest": "^1.6.0"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "publishConfig": {
+    "access": "public",
+    "provenance": true
+  }
+}
