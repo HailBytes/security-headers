@@ -1,14 +1,16 @@
 export { analyzeHeaders } from './analyzer.js';
 export { fetchHeaders } from './fetch.js';
 export type { SecurityHeaderReport, HeaderFinding, Grade, HeaderStatus } from './types.js';
+export type { FetchOptions } from './fetch.js';
 
 import { fetchHeaders } from './fetch.js';
 import { analyzeHeaders } from './analyzer.js';
 import type { SecurityHeaderReport } from './types.js';
+import type { FetchOptions } from './fetch.js';
 
-export async function analyze(input: string | Record<string, string>): Promise<SecurityHeaderReport> {
+export async function analyze(input: string | Record<string, string>, options?: FetchOptions): Promise<SecurityHeaderReport> {
   if (typeof input === 'string') {
-    const headers = await fetchHeaders(input);
+    const headers = await fetchHeaders(input, options);
     return analyzeHeaders(headers, input);
   }
   return analyzeHeaders(input);
