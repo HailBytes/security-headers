@@ -1,6 +1,6 @@
 {
-  "last_run": "2026-05-26T00:55:00Z",
-  "last_commit": "5083c52b64190381eadbb9f0c13b42e52c358a5a",
+  "last_run": "2026-05-26T04:15:00Z",
+  "last_commit": "81f8735d167b597ed7a7a88cc7f89ba0b440b07d",
   "filed": [
     {
       "issue": 8,
@@ -14,6 +14,19 @@
         "evidence_quality": 10
       },
       "timestamp": "2026-05-26T00:55:00Z"
+    },
+    {
+      "issue": 18,
+      "title": "[REVIEW] Referrer-Policy: `no-referrer-when-downgrade` classified as \"strong\" — awards full score for the historical browser default that leaks full URLs cross-origin",
+      "finding": "checkReferrerPolicy in src/rules.ts:113 includes 'no-referrer-when-downgrade' in its strongValues list, awarding 10/10 and status 'good' to a policy that sends the full URL including path and query string to every cross-origin HTTPS server — the value Chrome replaced as its default in 2020 specifically because it was too leaky.",
+      "score": 7.25,
+      "score_breakdown": {
+        "user_impact": 7,
+        "security_severity": 6,
+        "implementation_effort": 9,
+        "evidence_quality": 9
+      },
+      "timestamp": "2026-05-26T04:15:00Z"
     }
   ],
   "runner_ups": [
@@ -36,12 +49,6 @@
       "timestamp": "2026-05-26T00:55:00Z"
     },
     {
-      "finding": "Referrer-Policy classifies 'no-referrer-when-downgrade' as a strong value (score 10), but it is the historical default and is widely considered weak for cross-origin URL leakage.",
-      "score": 4.2,
-      "reason_not_filed": "lower score; borderline classification call rather than a clear bug",
-      "timestamp": "2026-05-26T00:55:00Z"
-    },
-    {
       "finding": "fetchHeaders uses method: 'HEAD' which causes false-missing readings on sites that set security headers conditionally on GET (e.g., HTML-only middleware).",
       "score": 8.1,
       "reason_not_filed": "duplicate of open issue #7",
@@ -52,6 +59,18 @@
       "score": 7.9,
       "reason_not_filed": "duplicate of open issue #5",
       "timestamp": "2026-05-26T00:55:00Z"
+    },
+    {
+      "finding": "checkPermissionsPolicy always returns a non-empty recommendations array even when status is 'good' (score 10) — every correctly configured site sees 'Fix: Set Permissions-Policy to...' in CLI output.",
+      "score": 6.15,
+      "reason_not_filed": "lower score than primary finding (7.25); low security severity; DX bug only",
+      "timestamp": "2026-05-26T04:15:00Z"
+    },
+    {
+      "finding": "CLI getVersion() in src/cli.ts uses require('../package.json') inside an ESM-type package — on Node 18/20, require is undefined in ESM context, so --version always prints 0.0.0 via the silent catch fallback.",
+      "score": 5.15,
+      "reason_not_filed": "lower score; no security impact; DX/correctness bug",
+      "timestamp": "2026-05-26T04:15:00Z"
     }
   ],
   "clean_areas": [
@@ -59,6 +78,8 @@
     "tsconfig.json strict mode is enabled",
     "CI workflows (ci.yml, publish.yml, auto-tag.yml) are sound",
     "X-Content-Type-Options check (rules.ts:93-104) — values correctly validated",
-    "X-Frame-Options check (rules.ts:73-91) — accepts DENY/SAMEORIGIN and CSP frame-ancestors fallback as expected"
+    "X-Frame-Options check (rules.ts:73-91) — accepts DENY/SAMEORIGIN and CSP frame-ancestors fallback as expected",
+    "fetch.ts AbortController timeout implementation (added in PRs #9/#10) is correctly structured",
+    "analyze() / analyzeHeaders() API surface and TypeScript types are consistent"
   ]
 }
