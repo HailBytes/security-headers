@@ -125,7 +125,21 @@ export function checkPermissionsPolicy(headers: RawHeaders): HeaderFinding {
     findings: ['Permissions-Policy not set — browser features are not restricted'],
     recommendations: ['Add Permissions-Policy: camera=(), microphone=(), geolocation=()'],
   };
-  return { header: 'Permissions-Policy', score: 10, maxScore: 10, status: 'good', raw, findings: [], recommendations: [] };
+  const lc = raw.toLowerCase();
+  const hasCam = lc.includes("camera=()");
+  const hasMic = lc.includes("microphone=()");
+  const hasGeo = lc.includes("geolocation=()");
+  const score = (hasCam && hasMic && hasGeo) ? 10 : 5;
+  const isGood = score === 10;
+  return {
+    header: "Permissions-Policy",
+    score,
+    maxScore: 10,
+    status: isGood ? "good" : "warning",
+    raw,
+    findings: isGood ? [] : ["Permissions-Policy does not restrict at least camera, microphone, and geolocation"],
+    recommendations: ["Set Permissions-Policy to camera=(), microphone=(), geolocation=(), and any other features needed by your app"]
+  };
 }
 
 export function checkCrossOriginPolicies(headers: RawHeaders): HeaderFinding {
