@@ -1,6 +1,6 @@
 {
-  "last_run": "2026-05-26T00:55:00Z",
-  "last_commit": "5083c52b64190381eadbb9f0c13b42e52c358a5a",
+  "last_run": "2026-05-26T08:10:00Z",
+  "last_commit": "81f8735d167b597ed7a7a88cc7f89ba0b440b07d",
   "filed": [
     {
       "issue": 8,
@@ -52,6 +52,30 @@
       "score": 7.9,
       "reason_not_filed": "duplicate of open issue #5",
       "timestamp": "2026-05-26T00:55:00Z"
+    },
+    {
+      "finding": "PR #2 merge (81f8735) introduced 4 failing tests in test/analyzer.test.ts: branch owl-alpha/add-tests-and-timeout was forked before commit 8d29a8c tightened Permissions-Policy scoring (require all 3 directives), so tests still expect old score-10-for-presence behavior. Failures: checkPermissionsPolicy > falls back to feature-policy header (line 275), permissions-policy takes precedence over feature-policy (line 281), case-insensitive header name matching (line 290), grade boundaries > A+ at 90% (line 340). CI runs npm test and would gate on these failures.",
+      "score": 8.1,
+      "score_breakdown": {
+        "user_impact": 8,
+        "security_severity": 7,
+        "implementation_effort": 9,
+        "evidence_quality": 10
+      },
+      "reason_not_filed": "GitHub MCP server required re-authorization (token expired) — deduplication searches and issue creation both blocked; carry forward to next run as top priority",
+      "timestamp": "2026-05-26T08:10:00Z"
+    },
+    {
+      "finding": "CSP wildcard regex /(?:default-src|script-src)\\s+\\*/i misses wildcards that are not the first source token: 'default-src 'self' *' and 'script-src 'self' *' both pass without any finding, receiving full CSP score while providing essentially no XSS protection.",
+      "score": 7.45,
+      "score_breakdown": {
+        "user_impact": 7,
+        "security_severity": 8,
+        "implementation_effort": 7,
+        "evidence_quality": 10
+      },
+      "reason_not_filed": "GitHub MCP server required re-authorization — deduplication against issue #5 could not be verified; potential duplicate",
+      "timestamp": "2026-05-26T08:10:00Z"
     }
   ],
   "clean_areas": [
@@ -59,6 +83,9 @@
     "tsconfig.json strict mode is enabled",
     "CI workflows (ci.yml, publish.yml, auto-tag.yml) are sound",
     "X-Content-Type-Options check (rules.ts:93-104) — values correctly validated",
-    "X-Frame-Options check (rules.ts:73-91) — accepts DENY/SAMEORIGIN and CSP frame-ancestors fallback as expected"
+    "X-Frame-Options check (rules.ts:73-91) — accepts DENY/SAMEORIGIN and CSP frame-ancestors fallback as expected",
+    "src/index.ts — exports are correct and FetchOptions type is exported",
+    "src/analyzer.ts — grade thresholds match README grading scale",
+    "src/fetch.ts — AbortController timeout is correctly implemented"
   ]
 }
