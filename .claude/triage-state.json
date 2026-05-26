@@ -1,6 +1,6 @@
 {
-  "last_run": "2026-05-26T05:18:00Z",
-  "last_commit": "5083c52b64190381eadbb9f0c13b42e52c358a5a",
+  "last_run": "2026-05-26T09:45:00Z",
+  "last_commit": "81f8735d167b597ed7a7a88cc7f89ba0b440b07d",
   "actions": [
     {
       "issue": 4,
@@ -19,6 +19,12 @@
       "action": "B",
       "timestamp": "2026-05-26T05:18:00Z",
       "summary": "User-directed override of 48h skip. Applied priority: high label (kept bug, security). Posted follow-up to existing triage comment with two new points: README.md:63 and src/rules.ts:46 themselves ship the vulnerable policy; proposed base-uri regex rejects valid multi-source restrictions (design choice to surface)."
+    },
+    {
+      "issue": 21,
+      "action": "A",
+      "timestamp": "2026-05-26T09:45:00Z",
+      "summary": "Confirmed false positive in src/rules.ts:53-56: unsafe-inline penalized unconditionally; no strict-dynamic+nonce guard exists; verified test gap at test/analyzer.test.ts:116-120; posted fix with low-risk conditional."
     }
   ],
   "skipped": [
@@ -26,6 +32,46 @@
       "issue": 5,
       "reason": "recently commented (substantive triage comment from BodenMcHale at 2026-05-26T00:35:18Z, ~4h ago, well within 48h skip window)",
       "timestamp": "2026-05-26T04:45:00Z"
+    },
+    {
+      "issue": 8,
+      "reason": "security bug but has 1 existing comment from 2026-05-26 — lower priority than #21 which had 0 comments",
+      "timestamp": "2026-05-26T09:45:00Z"
+    },
+    {
+      "issue": 15,
+      "reason": "correctness bug (lower priority than security bugs); has 1 existing comment from 2026-05-26",
+      "timestamp": "2026-05-26T09:45:00Z"
+    },
+    {
+      "issue": 16,
+      "reason": "security bug but has 1 existing comment from 2026-05-26 — lower priority than #21 which had 0 comments",
+      "timestamp": "2026-05-26T09:45:00Z"
+    },
+    {
+      "issue": 17,
+      "reason": "security bug but has 1 existing comment from 2026-05-26 — lower priority than #21 which had 0 comments",
+      "timestamp": "2026-05-26T09:45:00Z"
+    },
+    {
+      "issue": 18,
+      "reason": "security bug but has 1 existing comment from 2026-05-26 — lower priority than #21 which had 0 comments",
+      "timestamp": "2026-05-26T09:45:00Z"
+    },
+    {
+      "issue": 19,
+      "reason": "security bug but has 1 existing comment from 2026-05-26 — lower priority than #21 which had 0 comments",
+      "timestamp": "2026-05-26T09:45:00Z"
+    },
+    {
+      "issue": 20,
+      "reason": "security bug but has 1 existing comment from 2026-05-26 — lower priority than #21 which had 0 comments",
+      "timestamp": "2026-05-26T09:45:00Z"
+    },
+    {
+      "issue": 22,
+      "reason": "correctness bug (lower priority than security bugs); 0 comments but lower severity than #21",
+      "timestamp": "2026-05-26T09:45:00Z"
     }
   ]
 }
