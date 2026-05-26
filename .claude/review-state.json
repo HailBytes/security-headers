@@ -1,6 +1,6 @@
 {
-  "last_run": "2026-05-26T00:55:00Z",
-  "last_commit": "5083c52b64190381eadbb9f0c13b42e52c358a5a",
+  "last_run": "2026-05-26T07:10:00Z",
+  "last_commit": "81f8735d167b597ed7a7a88cc7f89ba0b440b07d",
   "filed": [
     {
       "issue": 8,
@@ -17,6 +17,18 @@
     }
   ],
   "runner_ups": [
+    {
+      "finding": "CSP wildcard regex /(?:default-src|script-src)\\s+\\*/i only matches when '*' is the first source token; 'default-src 'self' *' is not flagged.",
+      "score": 7.65,
+      "reason_not_filed": "matched open issue #15 (test failures / CI red); stopped per dedup rule",
+      "timestamp": "2026-05-26T07:10:00Z"
+    },
+    {
+      "finding": "test/analyzer.test.ts line 61: 'analyze with object returns same result as analyzeHeaders' uses toEqual() on full report including auto-generated analyzedAt timestamp — inherently flaky, fails when millisecond boundary is crossed between two sequential analyzeHeaders calls.",
+      "score": 5.65,
+      "reason_not_filed": "added as comment to open issue #15 (same CI-red topic); new evidence rather than separate filing",
+      "timestamp": "2026-05-26T07:10:00Z"
+    },
     {
       "finding": "CSP wildcard regex /(?:default-src|script-src)\\s+\\*/i only matches when '*' is the first source token; 'default-src 'self' *' is not flagged.",
       "score": 6.1,
@@ -59,6 +71,8 @@
     "tsconfig.json strict mode is enabled",
     "CI workflows (ci.yml, publish.yml, auto-tag.yml) are sound",
     "X-Content-Type-Options check (rules.ts:93-104) — values correctly validated",
-    "X-Frame-Options check (rules.ts:73-91) — accepts DENY/SAMEORIGIN and CSP frame-ancestors fallback as expected"
+    "X-Frame-Options check (rules.ts:73-91) — accepts DENY/SAMEORIGIN and CSP frame-ancestors fallback as expected",
+    "analyzer.ts grade thresholds are correctly implemented",
+    "src/index.ts analyze() overload (string | object) is correctly typed and routed"
   ]
 }
