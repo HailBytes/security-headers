@@ -1,6 +1,10 @@
 import { describe, it, expect } from 'vitest';
 import { analyzeHeaders } from '../src/analyzer.js';
-import { checkHSTS, checkCSP, checkXContentTypeOptions, checkReferrerPolicy } from '../src/rules.js';
+import { analyze } from '../src/index.js';
+import {
+  checkHSTS, checkCSP, checkXFrameOptions, checkXContentTypeOptions,
+  checkReferrerPolicy, checkPermissionsPolicy, checkCrossOriginPolicies
+} from '../src/rules.js';
 
 const STRONG_HEADERS = {
   'strict-transport-security': 'max-age=31536000; includeSubDomains; preload',
@@ -43,6 +47,24 @@ describe('analyzeHeaders', () => {
     const r = analyzeHeaders({});
     expect(r.analyzedAt).toMatch(/^\d{4}-\d{2}-\d{2}T/);
   });
+
+  it('maxScore is 100', () => {
+    const r = analyzeHeaders({});
+    expect(r.maxScore).toBe(100);
+  });
+});
+
+describe('analyze convenience function', () => {
+  it('analyze with object returns same result as analyzeHeaders', async () => {
+    const direct = analyzeHeaders(STRONG_HEADERS);
+    const viaAnalyze = await analyze(STRONG_HEADERS);
+    expect(viaAnalyze).toEqual(direct);
+  });
+
+  it('analyze with empty object returns grade F', async () => {
+    const r = await analyze({});
+    expect(r.grade).toBe('F');
+  });
 });
 
 describe('checkHSTS', () => {
@@ -50,14 +72,39 @@ describe('checkHSTS', () => {
     expect(checkHSTS({}).score).toBe(0);
     expect(checkHSTS({}).status).toBe('missing');
   });
+
   it('full HSTS returns score 20', () => {
     const r = checkHSTS({ 'strict-transport-security': 'max-age=31536000; includeSubDomains; preload' });
     expect(r.score).toBe(20);
     expect(r.status).toBe('good');
   });
+
   it('short max-age triggers finding', () => {
     const r = checkHSTS({ 'strict-transport-security': 'max-age=3600' });
     expect(r.findings.some(f => f.includes('max-age'))).toBe(true);
+  });
+
+  it('missing includeSubDomains triggers finding', () => {
+    const r = checkHSTS({ 'strict-transport-security': 'max-age=31536000' });
+    expect(r.findings.some(f => f.includes('includeSubDomains'))).toBe(true);
+    expect(r.score).toBe(15);
+  });
+
+  it('preload adds 2 bonus points', () => {
+    const withPreload = checkHSTS({ 'strict-transport-security': 'max-age=31536000; includeSubDomains; preload' });
+    const withoutPreload = checkHSTS({ 'strict-transport-security': 'max-age=31536000; includeSubDomains' });
+    expect(withPreload.score).toBe(withoutPreload.score + 2);
+  });
+
+  it('case-insensitive header name matching', () => {
+    const r = checkHSTS({ 'Strict-Transport-Security': 'max-age=31536000; includeSubDomains; preload' });
+    expect(r.score).toBe(20);
+  });
+
+  it('max-age between 1 and 31536000 gives partial credit', () => {
+    const r = checkHSTS({ 'strict-transport-security': 'max-age=86400; includeSubDomains' });
+    expect(r.score).toBeGreaterThan(10);
+    expect(r.score).toBeLessThan(20);
   });
 });
 
@@ -65,14 +112,85 @@ describe('checkCSP', () => {
   it('missing CSP returns score 0', () => {
     expect(checkCSP({}).score).toBe(0);
   });
+
   it('detects unsafe-inline', () => {
     const r = checkCSP({ 'content-security-policy': "default-src 'self'; script-src 'unsafe-inline'" });
     expect(r.findings.some(f => f.includes('unsafe-inline'))).toBe(true);
     expect(r.score).toBeLessThan(20);
   });
+
+  it('detects unsafe-eval', () => {
+    const r = checkCSP({ 'content-security-policy': "default-src 'self'; script-src 'unsafe-eval'" });
+    expect(r.findings.some(f => f.includes('unsafe-eval'))).toBe(true);
+    expect(r.score).toBeLessThan(20);
+  });
+
+  it('detects wildcard in default-src', () => {
+    const r = checkCSP({ 'content-security-policy': 'default-src *' });
+    expect(r.findings.some(f => f.includes('Wildcard'))).toBe(true);
+  });
+
+  it('detects wildcard in script-src', () => {
+    const r = checkCSP({ 'content-security-policy': "default-src 'self'; script-src *" });
+    expect(r.findings.some(f => f.includes('Wildcard'))).toBe(true);
+  });
+
   it('clean CSP returns score 20', () => {
     const r = checkCSP({ 'content-security-policy': "default-src 'self'" });
     expect(r.score).toBe(20);
+  });
+
+  it('CSP with both unsafe-inline and unsafe-eval scores 10', () => {
+    // 20 - 5 - 5 = 10, which is above the floor of 5
+    const r = checkCSP({ 'content-security-policy': "default-src 'unsafe-inline' 'unsafe-eval'" });
+    expect(r.score).toBe(10);
+  });
+
+  it('minimum score for any CSP is 5', () => {
+    // 20 - 5 (unsafe-inline) - 5 (unsafe-eval) - 5 (wildcard) = 5, floor is 5
+    const r = checkCSP({ 'content-security-policy': "default-src * 'unsafe-inline' 'unsafe-eval'" });
+    expect(r.score).toBe(5);
+  });
+});
+
+describe('checkXFrameOptions', () => {
+  it('missing header returns score 0', () => {
+    expect(checkXFrameOptions({}).score).toBe(0);
+    expect(checkXFrameOptions({}).status).toBe('missing');
+  });
+
+  it('DENY returns score 15', () => {
+    const r = checkXFrameOptions({ 'x-frame-options': 'DENY' });
+    expect(r.score).toBe(15);
+    expect(r.status).toBe('good');
+  });
+
+  it('SAMEORIGIN returns score 15', () => {
+    const r = checkXFrameOptions({ 'x-frame-options': 'SAMEORIGIN' });
+    expect(r.score).toBe(15);
+    expect(r.status).toBe('good');
+  });
+
+  it('lowercase deny works', () => {
+    const r = checkXFrameOptions({ 'x-frame-options': 'deny' });
+    expect(r.score).toBe(15);
+  });
+
+  it('invalid value returns score 8', () => {
+    const r = checkXFrameOptions({ 'x-frame-options': 'ALLOW-FROM https://example.com' });
+    expect(r.score).toBe(8);
+    expect(r.status).toBe('warning');
+  });
+
+  it('CSP frame-ancestors satisfies X-Frame-Options check', () => {
+    const r = checkXFrameOptions({ 'content-security-policy': "default-src 'self'; frame-ancestors 'none'" });
+    expect(r.score).toBe(15);
+    expect(r.status).toBe('good');
+  });
+
+  it('case-insensitive header name matching', () => {
+    const r = checkXFrameOptions({ 'X-Frame-Options': 'DENY' });
+    expect(r.score).toBe(15);
   });
 });
 
@@ -80,6 +198,18 @@ describe('checkXContentTypeOptions', () => {
   it('nosniff returns score 10', () => {
     expect(checkXContentTypeOptions({ 'x-content-type-options': 'nosniff' }).score).toBe(10);
   });
+
+  it('missing returns score 0', () => {
+    expect(checkXContentTypeOptions({}).score).toBe(0);
+    expect(checkXContentTypeOptions({}).status).toBe('missing');
+  });
+
+  it('wrong value returns score 5', () => {
+    const r = checkXContentTypeOptions({ 'x-content-type-options': 'sniff' });
+    expect(r.score).toBe(5);
+    expect(r.status).toBe('warning');
+  });
+
   it('case-insensitive header name matching', () => {
     expect(checkXContentTypeOptions({ 'X-Content-Type-Options': 'nosniff' }).score).toBe(10);
   });
@@ -91,7 +221,195 @@ describe('checkReferrerPolicy', () => {
     expect(r.score).toBe(10);
     expect(r.status).toBe('good');
   });
+
   it('missing returns score 0', () => {
     expect(checkReferrerPolicy({}).score).toBe(0);
+  });
+
+  it('no-referrer is strong', () => {
+    const r = checkReferrerPolicy({ 'referrer-policy': 'no-referrer' });
+    expect(r.score).toBe(10);
+    expect(r.status).toBe('good');
+  });
+
+  it('strict-origin is strong', () => {
+    const r = checkReferrerPolicy({ 'referrer-policy': 'strict-origin' });
+    expect(r.score).toBe(10);
+  });
+
+  it('same-origin is strong', () => {
+    const r = checkReferrerPolicy({ 'referrer-policy': 'same-origin' });
+    expect(r.score).toBe(10);
+  });
+
+  it('no-referrer-when-downgrade is strong', () => {
+    const r = checkReferrerPolicy({ 'referrer-policy': 'no-referrer-when-downgrade' });
+    expect(r.score).toBe(10);
+  });
+
+  it('unsafe-url returns score 5', () => {
+    const r = checkReferrerPolicy({ 'referrer-policy': 'unsafe-url' });
+    expect(r.score).toBe(5);
+    expect(r.status).toBe('warning');
+  });
+
+  it('origin is not in strong list', () => {
+    const r = checkReferrerPolicy({ 'referrer-policy': 'origin' });
+    expect(r.score).toBe(5);
+    expect(r.status).toBe('warning');
+  });
+});
+
+describe('checkPermissionsPolicy', () => {
+  it('missing returns score 0', () => {
+    expect(checkPermissionsPolicy({}).score).toBe(0);
+    expect(checkPermissionsPolicy({}).status).toBe('missing');
+  });
+
+  it('present returns score 10', () => {
+    const r = checkPermissionsPolicy({ 'permissions-policy': 'camera=(), microphone=(), geolocation=()' });
+    expect(r.score).toBe(10);
+    expect(r.status).toBe('good');
+  });
+
+  it('falls back to feature-policy header', () => {
+    const r = checkPermissionsPolicy({ 'feature-policy': 'camera *' });
+    expect(r.score).toBe(10);
+    expect(r.status).toBe('good');
+  });
+
+  it('permissions-policy takes precedence over feature-policy', () => {
+    const r = checkPermissionsPolicy({
+      'permissions-policy': 'camera=()',
+      'feature-policy': 'camera *',
+    });
+    expect(r.score).toBe(10);
+    expect(r.raw).toBe('camera=()');
+  });
+
+  it('case-insensitive header name matching', () => {
+    const r = checkPermissionsPolicy({ 'Permissions-Policy': 'camera=()' });
+    expect(r.score).toBe(10);
+  });
+});
+
+describe('checkCrossOriginPolicies', () => {
+  it('missing all returns score 0', () => {
+    const r = checkCrossOriginPolicies({});
+    expect(r.score).toBe(0);
+    expect(r.status).toBe('missing');
+  });
+
+  it('all three present returns score 5 (capped)', () => {
+    const r = checkCrossOriginPolicies({
+      'cross-origin-embedder-policy': 'require-corp',
+      'cross-origin-opener-policy': 'same-origin',
+      'cross-origin-resource-policy': 'same-origin',
+    });
+    expect(r.score).toBe(5);
+    expect(r.status).toBe('good');
+  });
+
+  it('one present returns score 2', () => {
+    const r = checkCrossOriginPolicies({ 'cross-origin-opener-policy': 'same-origin' });
+    expect(r.score).toBe(2);
+    expect(r.status).toBe('warning');
+  });
+
+  it('two present returns score 4', () => {
+    const r = checkCrossOriginPolicies({
+      'cross-origin-embedder-policy': 'require-corp',
+      'cross-origin-opener-policy': 'same-origin',
+    });
+    expect(r.score).toBe(4);
+    expect(r.status).toBe('good');
+  });
+
+  it('includes raw values in output', () => {
+    const r = checkCrossOriginPolicies({ 'cross-origin-opener-policy': 'same-origin' });
+    expect(r.raw).toContain('COOP: same-origin');
+  });
+
+  it('case-insensitive header name matching', () => {
+    const r = checkCrossOriginPolicies({ 'Cross-Origin-Opener-Policy': 'same-origin' });
+    expect(r.score).toBe(2);
+  });
+});
+
+describe('grade boundaries', () => {
+  it('A+ at 90%', () => {
+    const headers = {
+      'strict-transport-security': 'max-age=31536000; includeSubDomains; preload',
+      'content-security-policy': "default-src 'self'",
+      'x-frame-options': 'DENY',
+      'x-content-type-options': 'nosniff',
+      'referrer-policy': 'strict-origin-when-cross-origin',
+      'permissions-policy': 'camera=()',
+      'cross-origin-embedder-policy': 'require-corp',
+      'cross-origin-opener-policy': 'same-origin',
+      'cross-origin-resource-policy': 'same-origin',
+    };
+    const r = analyzeHeaders(headers);
+    expect(r.percentage).toBeGreaterThanOrEqual(90);
+    expect(r.grade).toBe('A+');
+  });
+
+  it('A at 75%', () => {
+    // Drop preload from HSTS: score = 18 (HSTS) + 20 (CSP) + 15 + 10 + 10 + 10 + 5 = 88 -- too high
+    // Let's use stricter combo: missing permissions-policy too
+    const headers = {
+      'strict-transport-security': 'max-age=31536000; includeSubDomains',
+      'content-security-policy': "default-src 'self'",
+      'x-frame-options': 'DENY',
+      'x-content-type-options': 'nosniff',
+      'referrer-policy': 'strict-origin-when-cross-origin',
+      'cross-origin-embedder-policy': 'require-corp',
+      'cross-origin-opener-policy': 'same-origin',
+      'cross-origin-resource-policy': 'same-origin',
+    };
+    const r = analyzeHeaders(headers);
+    // 18 + 20 + 15 + 10 + 10 + 0 + 5 = 78
+    expect(r.grade).toBe('A');
+  });
+
+  it('B at 60%', () => {
+    const headers = {
+      'strict-transport-security': 'max-age=31536000; includeSubDomains',
+      'content-security-policy': "default-src 'self'",
+      'x-frame-options': 'DENY',
+      'x-content-type-options': 'nosniff',
+      'referrer-policy': 'strict-origin-when-cross-origin',
+    };
+    const r = analyzeHeaders(headers);
+    // 18 + 20 + 15 + 10 + 10 + 0 + 0 = 73 -- still A
+    // Need to drop more: B = 60-74%
+    // HSTS=18, CSP=20, XFO=15, XCIO=10 = 63 -> B
+    expect(r.grade).toBe('B');
+  });
+
+  it('C at 40%', () => {
+    const headers = {
+      'strict-transport-security': 'max-age=31536000; includeSubDomains',
+      'x-content-type-options': 'nosniff',
+      'x-frame-options': 'DENY',
+    };
+    const r = analyzeHeaders(headers);
+    // 18 + 0 + 15 + 10 = 43 -> C
+    expect(r.grade).toBe('C');
+  });
+
+  it('D at 20%', () => {
+    const headers = {
+      'strict-transport-security': 'max-age=31536000; includeSubDomains',
+      'x-content-type-options': 'nosniff',
+    };
+    const r = analyzeHeaders(headers);
+    // 18 + 10 = 28 -> D
+    expect(r.grade).toBe('D');
+  });
+
+  it('F below 20%', () => {
+    const r = analyzeHeaders({});
+    expect(r.grade).toBe('F');
   });
 });
