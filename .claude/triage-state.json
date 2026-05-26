@@ -1,6 +1,6 @@
 {
-  "last_run": "2026-05-26T05:18:00Z",
-  "last_commit": "5083c52b64190381eadbb9f0c13b42e52c358a5a",
+  "last_run": "2026-05-26T12:00:00Z",
+  "last_commit": "81f8735d167b597ed7a7a88cc7f89ba0b440b07d",
   "actions": [
     {
       "issue": 4,
@@ -19,6 +19,12 @@
       "action": "B",
       "timestamp": "2026-05-26T05:18:00Z",
       "summary": "User-directed override of 48h skip. Applied priority: high label (kept bug, security). Posted follow-up to existing triage comment with two new points: README.md:63 and src/rules.ts:46 themselves ship the vulnerable policy; proposed base-uri regex rejects valid multi-source restrictions (design choice to surface)."
+    },
+    {
+      "issue": 22,
+      "action": "A",
+      "timestamp": "2026-05-26T12:00:00Z",
+      "summary": "Confirmed recommendations array always populated at src/rules.ts:141 regardless of isGood flag; test gap at test/analyzer.test.ts:269-272; CLI spurious Fix: output at cli.ts:61. One-line ternary fix posted."
     }
   ],
   "skipped": [
@@ -26,6 +32,51 @@
       "issue": 5,
       "reason": "recently commented (substantive triage comment from BodenMcHale at 2026-05-26T00:35:18Z, ~4h ago, well within 48h skip window)",
       "timestamp": "2026-05-26T04:45:00Z"
+    },
+    {
+      "issue": 8,
+      "reason": "recently commented — substantive triage review from BodenMcHale at 2026-05-26T01:16:57Z covering src/rules.ts:149-150 presence-only scoring and full suggested fix",
+      "timestamp": "2026-05-26T12:00:00Z"
+    },
+    {
+      "issue": 16,
+      "reason": "recently commented — substantive triage review from BodenMcHale at 2026-05-26T02:17:47Z covering src/rules.ts:63 narrow wildcard regex and per-directive fix",
+      "timestamp": "2026-05-26T12:00:00Z"
+    },
+    {
+      "issue": 17,
+      "reason": "recently commented — substantive triage review from BodenMcHale at 2026-05-26T03:17:36Z covering src/rules.ts:21-38 max-age=0 bonus scoring and early-return fix",
+      "timestamp": "2026-05-26T12:00:00Z"
+    },
+    {
+      "issue": 18,
+      "reason": "recently commented — substantive triage review from BodenMcHale at 2026-05-26T04:18:25Z covering src/rules.ts:113 no-referrer-when-downgrade in strongValues",
+      "timestamp": "2026-05-26T12:00:00Z"
+    },
+    {
+      "issue": 19,
+      "reason": "recently commented — substantive triage review from BodenMcHale at 2026-05-26T05:17:32Z covering missing form-action check in checkCSP",
+      "timestamp": "2026-05-26T12:00:00Z"
+    },
+    {
+      "issue": 20,
+      "reason": "recently commented — substantive triage review from BodenMcHale at 2026-05-26T06:17:57Z covering CSP-Report-Only invisibility at src/rules.ts:42",
+      "timestamp": "2026-05-26T12:00:00Z"
+    },
+    {
+      "issue": 21,
+      "reason": "recently commented — substantive triage review from BodenMcHale at 2026-05-26T09:20:33Z covering unsafe-inline false positive when strict-dynamic+nonce present",
+      "timestamp": "2026-05-26T12:00:00Z"
+    },
+    {
+      "issue": 23,
+      "reason": "recently commented — substantive triage review from BodenMcHale at 2026-05-26T10:18:08Z covering frame-ancestors presence-only check at src/rules.ts:76-84",
+      "timestamp": "2026-05-26T12:00:00Z"
+    },
+    {
+      "issue": 15,
+      "reason": "recently commented — review run comment from BodenMcHale at 2026-05-26T07:11:53Z confirming 5 test failures and suggesting analyzedAt exclusion fix",
+      "timestamp": "2026-05-26T12:00:00Z"
     }
   ]
 }
