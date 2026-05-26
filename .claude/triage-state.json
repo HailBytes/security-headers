@@ -1,6 +1,6 @@
 {
-  "last_run": "2026-05-26T05:18:00Z",
-  "last_commit": "5083c52b64190381eadbb9f0c13b42e52c358a5a",
+  "last_run": "2026-05-26T06:35:00Z",
+  "last_commit": "81f8735d167b597ed7a7a88cc7f89ba0b440b07d",
   "actions": [
     {
       "issue": 4,
@@ -19,6 +19,12 @@
       "action": "B",
       "timestamp": "2026-05-26T05:18:00Z",
       "summary": "User-directed override of 48h skip. Applied priority: high label (kept bug, security). Posted follow-up to existing triage comment with two new points: README.md:63 and src/rules.ts:46 themselves ship the vulnerable policy; proposed base-uri regex rejects valid multi-source restrictions (design choice to surface)."
+    },
+    {
+      "issue": 16,
+      "action": "A",
+      "timestamp": "2026-05-26T06:35:00Z",
+      "summary": "Verified CSP wildcard detection gap at src/rules.ts:63 — regex misses connect-src/form-action/frame-src/worker-src wildcards and mid-policy wildcards like 'self' *; posted substantive comment with per-directive fix path and OWASP/MDN references."
     }
   ],
   "skipped": [
@@ -26,6 +32,11 @@
       "issue": 5,
       "reason": "recently commented (substantive triage comment from BodenMcHale at 2026-05-26T00:35:18Z, ~4h ago, well within 48h skip window)",
       "timestamp": "2026-05-26T04:45:00Z"
+    },
+    {
+      "issue": 8,
+      "reason": "recently commented — substantive triage comment posted at 2026-05-26T01:16:57Z, well within 48h skip window",
+      "timestamp": "2026-05-26T06:35:00Z"
     }
   ]
 }
