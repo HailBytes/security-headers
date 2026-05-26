@@ -1,6 +1,6 @@
 {
-  "last_run": "2026-05-26T00:55:00Z",
-  "last_commit": "5083c52b64190381eadbb9f0c13b42e52c358a5a",
+  "last_run": "2026-05-26T10:00:00Z",
+  "last_commit": "81f8735d167b597ed7a7a88cc7f89ba0b440b07d",
   "filed": [
     {
       "issue": 8,
@@ -14,19 +14,32 @@
         "evidence_quality": 10
       },
       "timestamp": "2026-05-26T00:55:00Z"
+    },
+    {
+      "issue": 23,
+      "title": "[REVIEW] X-Frame-Options: `checkXFrameOptions` awards 15/15 \"good\" for any `frame-ancestors` value — including `frame-ancestors *` which provides zero clickjacking protection",
+      "finding": "checkXFrameOptions in src/rules.ts:76-85 detects frame-ancestors by presence only via /frame-ancestors/i regex; the directive's value is never inspected, so frame-ancestors * and frame-ancestors https: both receive 15/15 'good' with no findings.",
+      "score": 8.10,
+      "score_breakdown": {
+        "user_impact": 7,
+        "security_severity": 8,
+        "implementation_effort": 9,
+        "evidence_quality": 10
+      },
+      "timestamp": "2026-05-26T10:00:00Z"
     }
   ],
   "runner_ups": [
     {
       "finding": "CSP wildcard regex /(?:default-src|script-src)\\s+\\*/i only matches when '*' is the first source token; 'default-src 'self' *' is not flagged.",
       "score": 6.1,
-      "reason_not_filed": "lower score; subsumed by broader CSP-evaluator-style follow-up to #5",
+      "reason_not_filed": "lower score; now covered by open issue #16",
       "timestamp": "2026-05-26T00:55:00Z"
     },
     {
       "finding": "checkCSP does not recognize Content-Security-Policy-Report-Only header; report-only deployments are treated as if no CSP exists.",
       "score": 5.9,
-      "reason_not_filed": "lower score; needs design discussion on whether report-only should count for points",
+      "reason_not_filed": "lower score; now covered by open issue #20",
       "timestamp": "2026-05-26T00:55:00Z"
     },
     {
@@ -38,7 +51,7 @@
     {
       "finding": "Referrer-Policy classifies 'no-referrer-when-downgrade' as a strong value (score 10), but it is the historical default and is widely considered weak for cross-origin URL leakage.",
       "score": 4.2,
-      "reason_not_filed": "lower score; borderline classification call rather than a clear bug",
+      "reason_not_filed": "lower score; now covered by open issue #18",
       "timestamp": "2026-05-26T00:55:00Z"
     },
     {
@@ -50,7 +63,7 @@
     {
       "finding": "checkCSP does not flag missing base-uri directive, leaving <base> injection silently bypassing script-src 'self'.",
       "score": 7.9,
-      "reason_not_filed": "duplicate of open issue #5",
+      "reason_not_filed": "duplicate of issue #5 (now closed/resolved)",
       "timestamp": "2026-05-26T00:55:00Z"
     }
   ],
@@ -59,6 +72,6 @@
     "tsconfig.json strict mode is enabled",
     "CI workflows (ci.yml, publish.yml, auto-tag.yml) are sound",
     "X-Content-Type-Options check (rules.ts:93-104) — values correctly validated",
-    "X-Frame-Options check (rules.ts:73-91) — accepts DENY/SAMEORIGIN and CSP frame-ancestors fallback as expected"
+    "Open PRs #11-#14 are all Dependabot dependency bumps — no security-relevant source changes in flight"
   ]
 }
