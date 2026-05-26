@@ -1,6 +1,6 @@
 {
-  "last_run": "2026-05-26T05:18:00Z",
-  "last_commit": "5083c52b64190381eadbb9f0c13b42e52c358a5a",
+  "last_run": "2026-05-26T10:30:00Z",
+  "last_commit": "81f8735d167b597ed7a7a88cc7f89ba0b440b07d",
   "actions": [
     {
       "issue": 4,
@@ -19,6 +19,12 @@
       "action": "B",
       "timestamp": "2026-05-26T05:18:00Z",
       "summary": "User-directed override of 48h skip. Applied priority: high label (kept bug, security). Posted follow-up to existing triage comment with two new points: README.md:63 and src/rules.ts:46 themselves ship the vulnerable policy; proposed base-uri regex rejects valid multi-source restrictions (design choice to surface)."
+    },
+    {
+      "issue": 23,
+      "action": "A",
+      "timestamp": "2026-05-26T10:30:00Z",
+      "summary": "Confirmed frame-ancestors presence-only detection bug at src/rules.ts:76-84 in HEAD 81f8735; posted triage review confirming no fix in recent commits, root cause analysis, fix path validation, and priority: high assessment."
     }
   ],
   "skipped": [
@@ -26,6 +32,61 @@
       "issue": 5,
       "reason": "recently commented (substantive triage comment from BodenMcHale at 2026-05-26T00:35:18Z, ~4h ago, well within 48h skip window)",
       "timestamp": "2026-05-26T04:45:00Z"
+    },
+    {
+      "issue": 4,
+      "reason": "acted on in previous run within 7 days",
+      "timestamp": "2026-05-26T10:30:00Z"
+    },
+    {
+      "issue": 7,
+      "reason": "acted on in previous run within 7 days",
+      "timestamp": "2026-05-26T10:30:00Z"
+    },
+    {
+      "issue": 8,
+      "reason": "1 comment within 48h window — substantive content already present",
+      "timestamp": "2026-05-26T10:30:00Z"
+    },
+    {
+      "issue": 15,
+      "reason": "1 comment within 48h window — substantive content already present",
+      "timestamp": "2026-05-26T10:30:00Z"
+    },
+    {
+      "issue": 16,
+      "reason": "1 comment within 48h window — substantive content already present",
+      "timestamp": "2026-05-26T10:30:00Z"
+    },
+    {
+      "issue": 17,
+      "reason": "1 comment within 48h window — substantive content already present",
+      "timestamp": "2026-05-26T10:30:00Z"
+    },
+    {
+      "issue": 18,
+      "reason": "1 comment within 48h window — substantive content already present",
+      "timestamp": "2026-05-26T10:30:00Z"
+    },
+    {
+      "issue": 19,
+      "reason": "1 comment within 48h window — substantive content already present",
+      "timestamp": "2026-05-26T10:30:00Z"
+    },
+    {
+      "issue": 20,
+      "reason": "1 comment within 48h window — substantive content already present",
+      "timestamp": "2026-05-26T10:30:00Z"
+    },
+    {
+      "issue": 21,
+      "reason": "1 comment within 48h window — substantive content already present",
+      "timestamp": "2026-05-26T10:30:00Z"
+    },
+    {
+      "issue": 22,
+      "reason": "lower priority (bug/good-first-issue, no security label) — deferred in favour of #23 security bug",
+      "timestamp": "2026-05-26T10:30:00Z"
     }
   ]
 }
