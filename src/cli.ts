@@ -1,6 +1,9 @@
 #!/usr/bin/env node
+import { createRequire } from 'node:module';
 import { analyze } from './index.js';
 import type { SecurityHeaderReport } from './types.js';
+
+const require = createRequire(import.meta.url);
 
 const R = '\x1b[0m';
 const B = '\x1b[1m';
@@ -18,8 +21,8 @@ const STATUS_ICON: Record<string, string> = {
 
 function getVersion(): string {
   try {
-    const pkg = require('../package.json');
-    return pkg.version;
+    const pkg = require('../package.json') as { version?: string };
+    return pkg.version ?? '0.0.0';
   } catch {
     return '0.0.0';
   }
