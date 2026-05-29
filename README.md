@@ -61,7 +61,7 @@ import { analyzeHeaders } from '@hailbytes/security-headers';
 
 const report = analyzeHeaders({
   'strict-transport-security': 'max-age=31536000; includeSubDomains',
-  'content-security-policy': "default-src 'self'",
+  'content-security-policy': "default-src 'self'; form-action 'self'",
   'x-frame-options': 'DENY',
   'x-content-type-options': 'nosniff',
   'referrer-policy': 'strict-origin-when-cross-origin',
@@ -121,7 +121,7 @@ interface HeaderFinding {
 | Header | Max Points | Key Checks |
 |---|---|---|
 | Strict-Transport-Security | 20 | max-age ≥ 1 year, includeSubDomains, preload |
-| Content-Security-Policy | 30 | presence, no unsafe-inline/eval, no wildcards |
+| Content-Security-Policy | 30 | presence, no unsafe-inline/eval, no wildcards, form-action set |
 | X-Frame-Options | 15 | DENY or SAMEORIGIN (or CSP frame-ancestors) |
 | X-Content-Type-Options | 10 | nosniff |
 | Referrer-Policy | 10 | strict values only |

@@ -8,7 +8,7 @@ import {
 
 const STRONG_HEADERS = {
   'strict-transport-security': 'max-age=31536000; includeSubDomains; preload',
-  'content-security-policy': "default-src 'self'; img-src *",
+  'content-security-policy': "default-src 'self'; img-src *; form-action 'self'",
   'x-frame-options': 'DENY',
   'x-content-type-options': 'nosniff',
   'referrer-policy': 'strict-origin-when-cross-origin',
@@ -58,7 +58,13 @@ describe('analyze convenience function', () => {
   it('analyze with object returns same result as analyzeHeaders', async () => {
     const direct = analyzeHeaders(STRONG_HEADERS);
     const viaAnalyze = await analyze(STRONG_HEADERS);
-    expect(viaAnalyze).toEqual(direct);
+    // analyzedAt is wall-clock and is computed independently in each call, so
+    // compare everything else and assert both timestamps are valid ISO strings.
+    const { analyzedAt: directAt, ...directRest } = direct;
+    const { analyzedAt: viaAt, ...viaRest } = viaAnalyze;
+    expect(viaRest).toEqual(directRest);
+    expect(directAt).toMatch(/^\d{4}-\d{2}-\d{2}T/);
+    expect(viaAt).toMatch(/^\d{4}-\d{2}-\d{2}T/);
   });
 
   it('analyze with empty object returns grade F', async () => {
@@ -101,6 +107,13 @@ describe('checkHSTS', () => {
     expect(r.score).toBe(20);
   });
 
+  it('max-age=0 is a revocation: warning, no includeSubDomains/preload bonus', () => {
+    const r = checkHSTS({ 'strict-transport-security': 'max-age=0; includeSubDomains; preload' });
+    expect(r.score).toBe(10);
+    expect(r.status).toBe('warning');
+    expect(r.findings.some(f => /revoke/i.test(f))).toBe(true);
+  });
+
   it('max-age between 1 and 31536000 gives partial credit', () => {
     const r = checkHSTS({ 'strict-transport-security': 'max-age=86400; includeSubDomains' });
     expect(r.score).toBeGreaterThan(10);
@@ -111,6 +124,22 @@ describe('checkHSTS', () => {
 describe('checkCSP', () => {
   it('missing CSP returns score 0', () => {
     expect(checkCSP({}).score).toBe(0);
+  });
+
+  it('report-only CSP gets partial credit and a warning, not missing', () => {
+    const r = checkCSP({ 'content-security-policy-report-only': "default-src 'self'" });
+    expect(r.status).toBe('warning');
+    expect(r.score).toBe(10);
+    expect(r.findings.some(f => /report-only/i.test(f))).toBe(true);
+  });
+
+  it('enforcing CSP takes precedence over report-only', () => {
+    const r = checkCSP({
+      'content-security-policy': "default-src 'self'; form-action 'self'",
+      'content-security-policy-report-only': "default-src *",
+    });
+    expect(r.score).toBe(20);
+    expect(r.status).toBe('good');
   });
 
   it('detects unsafe-inline', () => {
@@ -135,14 +164,61 @@ describe('checkCSP', () => {
     expect(r.findings.some(f => f.includes('Wildcard'))).toBe(true);
   });
 
+  it("does not penalize 'unsafe-inline' when 'strict-dynamic' + nonce present", () => {
+    const r = checkCSP({ 'content-security-policy': "script-src 'strict-dynamic' 'nonce-abc123' 'unsafe-inline' https://example.com; form-action 'self'" });
+    expect(r.findings.some(f => f.includes('unsafe-inline'))).toBe(false);
+    expect(r.score).toBe(20);
+  });
+
+  it("still penalizes 'unsafe-inline' when 'strict-dynamic' present without nonce/hash", () => {
+    const r = checkCSP({ 'content-security-policy': "script-src 'strict-dynamic' 'unsafe-inline'" });
+    expect(r.findings.some(f => f.includes('unsafe-inline'))).toBe(true);
+  });
+
+  it('detects wildcard in connect-src', () => {
+    const r = checkCSP({ 'content-security-policy': "default-src 'self'; form-action 'self'; connect-src *" });
+    expect(r.findings.some(f => /Wildcard.*connect-src/i.test(f))).toBe(true);
+    expect(r.score).toBe(15);
+  });
+
+  it('detects wildcard in form-action', () => {
+    const r = checkCSP({ 'content-security-policy': "default-src 'self'; form-action *" });
+    expect(r.findings.some(f => /Wildcard.*form-action/i.test(f))).toBe(true);
+  });
+
+  it("detects mid-policy wildcard (default-src 'self' *)", () => {
+    const r = checkCSP({ 'content-security-policy': "default-src 'self' *; form-action 'self'" });
+    expect(r.findings.some(f => /Wildcard/i.test(f))).toBe(true);
+    expect(r.score).toBe(15);
+  });
+
+  it('does not flag a wildcard in low-risk img-src', () => {
+    const r = checkCSP({ 'content-security-policy': "default-src 'self'; form-action 'self'; img-src *" });
+    expect(r.findings.some(f => /Wildcard/i.test(f))).toBe(false);
+    expect(r.score).toBe(20);
+  });
+
   it('clean CSP returns score 20', () => {
+    const r = checkCSP({ 'content-security-policy': "default-src 'self'; form-action 'self'" });
+    expect(r.score).toBe(20);
+  });
+
+  it('flags missing form-action directive', () => {
     const r = checkCSP({ 'content-security-policy': "default-src 'self'" });
+    expect(r.findings.some(f => /form-action/i.test(f))).toBe(true);
+    expect(r.status).toBe('warning');
+    expect(r.score).toBe(17);
+  });
+
+  it("form-action 'none' satisfies the form-action check", () => {
+    const r = checkCSP({ 'content-security-policy': "default-src 'self'; form-action 'none'" });
+    expect(r.findings.some(f => /form-action/i.test(f))).toBe(false);
     expect(r.score).toBe(20);
   });
 
   it('CSP with both unsafe-inline and unsafe-eval scores 10', () => {
     // 20 - 5 - 5 = 10, which is above the floor of 5
-    const r = checkCSP({ 'content-security-policy': "default-src 'unsafe-inline' 'unsafe-eval'" });
+    const r = checkCSP({ 'content-security-policy': "default-src 'unsafe-inline' 'unsafe-eval'; form-action 'self'" });
     expect(r.score).toBe(10);
   });
 
@@ -186,6 +262,25 @@ describe('checkXFrameOptions', () => {
     const r = checkXFrameOptions({ 'content-security-policy': "default-src 'self'; frame-ancestors 'none'" });
     expect(r.score).toBe(15);
     expect(r.status).toBe('good');
+  });
+
+  it("CSP frame-ancestors 'self' with specific origins is protective", () => {
+    const r = checkXFrameOptions({ 'content-security-policy': "frame-ancestors 'self' https://trusted.example" });
+    expect(r.score).toBe(15);
+    expect(r.status).toBe('good');
+  });
+
+  it('CSP frame-ancestors * is not protective', () => {
+    const r = checkXFrameOptions({ 'content-security-policy': 'frame-ancestors *' });
+    expect(r.score).toBe(8);
+    expect(r.status).toBe('warning');
+    expect(r.findings.some(f => /any origin/i.test(f))).toBe(true);
+  });
+
+  it('CSP frame-ancestors with bare scheme (https:) is not protective', () => {
+    const r = checkXFrameOptions({ 'content-security-policy': 'frame-ancestors https:' });
+    expect(r.score).toBe(8);
+    expect(r.status).toBe('warning');
   });
 
   it('case-insensitive header name matching', () => {
@@ -242,9 +337,10 @@ describe('checkReferrerPolicy', () => {
     expect(r.score).toBe(10);
   });
 
-  it('no-referrer-when-downgrade is strong', () => {
+  it('no-referrer-when-downgrade is not strong (leaks full URL cross-origin)', () => {
     const r = checkReferrerPolicy({ 'referrer-policy': 'no-referrer-when-downgrade' });
-    expect(r.score).toBe(10);
+    expect(r.score).toBe(5);
+    expect(r.status).toBe('warning');
   });
 
   it('unsafe-url returns score 5', () => {
@@ -273,22 +369,40 @@ describe('checkPermissionsPolicy', () => {
   });
 
   it('falls back to feature-policy header', () => {
-    const r = checkPermissionsPolicy({ 'feature-policy': 'camera *' });
+    const r = checkPermissionsPolicy({ 'feature-policy': 'camera=(), microphone=(), geolocation=()' });
     expect(r.score).toBe(10);
     expect(r.status).toBe('good');
   });
 
   it('permissions-policy takes precedence over feature-policy', () => {
     const r = checkPermissionsPolicy({
-      'permissions-policy': 'camera=()',
+      'permissions-policy': 'camera=(), microphone=(), geolocation=()',
       'feature-policy': 'camera *',
     });
     expect(r.score).toBe(10);
-    expect(r.raw).toBe('camera=()');
+    expect(r.raw).toBe('camera=(), microphone=(), geolocation=()');
+  });
+
+  it('partial policy (camera only) returns warning, not full score', () => {
+    const r = checkPermissionsPolicy({ 'permissions-policy': 'camera=()' });
+    expect(r.score).toBe(5);
+    expect(r.status).toBe('warning');
+  });
+
+  it('good policy emits no recommendations', () => {
+    const r = checkPermissionsPolicy({ 'permissions-policy': 'camera=(), microphone=(), geolocation=()' });
+    expect(r.status).toBe('good');
+    expect(r.findings).toEqual([]);
+    expect(r.recommendations).toEqual([]);
+  });
+
+  it('warning policy still emits a recommendation', () => {
+    const r = checkPermissionsPolicy({ 'permissions-policy': 'camera=()' });
+    expect(r.recommendations.length).toBeGreaterThan(0);
   });
 
   it('case-insensitive header name matching', () => {
-    const r = checkPermissionsPolicy({ 'Permissions-Policy': 'camera=()' });
+    const r = checkPermissionsPolicy({ 'Permissions-Policy': 'camera=(), microphone=(), geolocation=()' });
     expect(r.score).toBe(10);
   });
 });
@@ -325,6 +439,31 @@ describe('checkCrossOriginPolicies', () => {
     expect(r.status).toBe('good');
   });
 
+  it('permissive values (unsafe-none / cross-origin) earn no credit', () => {
+    const r = checkCrossOriginPolicies({
+      'cross-origin-embedder-policy': 'unsafe-none',
+      'cross-origin-opener-policy': 'unsafe-none',
+      'cross-origin-resource-policy': 'cross-origin',
+    });
+    expect(r.score).toBe(0);
+    expect(r.status).toBe('warning');
+    expect(r.findings.every(f => /no cross-origin isolation/i.test(f))).toBe(true);
+  });
+
+  it('mixed: only protective values count', () => {
+    const r = checkCrossOriginPolicies({
+      'cross-origin-opener-policy': 'same-origin',     // protective
+      'cross-origin-resource-policy': 'cross-origin',  // permissive
+    });
+    expect(r.score).toBe(2);
+    expect(r.status).toBe('warning');
+  });
+
+  it('COOP same-origin-allow-popups counts as protective', () => {
+    const r = checkCrossOriginPolicies({ 'cross-origin-opener-policy': 'same-origin-allow-popups' });
+    expect(r.score).toBe(2);
+  });
+
   it('includes raw values in output', () => {
     const r = checkCrossOriginPolicies({ 'cross-origin-opener-policy': 'same-origin' });
     expect(r.raw).toContain('COOP: same-origin');
@@ -340,11 +479,11 @@ describe('grade boundaries', () => {
   it('A+ at 90%', () => {
     const headers = {
       'strict-transport-security': 'max-age=31536000; includeSubDomains; preload',
-      'content-security-policy': "default-src 'self'",
+      'content-security-policy': "default-src 'self'; form-action 'self'",
       'x-frame-options': 'DENY',
       'x-content-type-options': 'nosniff',
       'referrer-policy': 'strict-origin-when-cross-origin',
-      'permissions-policy': 'camera=()',
+      'permissions-policy': 'camera=(), microphone=(), geolocation=()',
       'cross-origin-embedder-policy': 'require-corp',
       'cross-origin-opener-policy': 'same-origin',
       'cross-origin-resource-policy': 'same-origin',
@@ -359,7 +498,7 @@ describe('grade boundaries', () => {
     // Let's use stricter combo: missing permissions-policy too
     const headers = {
       'strict-transport-security': 'max-age=31536000; includeSubDomains',
-      'content-security-policy': "default-src 'self'",
+      'content-security-policy': "default-src 'self'; form-action 'self'",
       'x-frame-options': 'DENY',
       'x-content-type-options': 'nosniff',
       'referrer-policy': 'strict-origin-when-cross-origin',
@@ -375,7 +514,7 @@ describe('grade boundaries', () => {
   it('B at 60%', () => {
     const headers = {
       'strict-transport-security': 'max-age=31536000; includeSubDomains',
-      'content-security-policy': "default-src 'self'",
+      'content-security-policy': "default-src 'self'; form-action 'self'",
       'x-frame-options': 'DENY',
       'x-content-type-options': 'nosniff',
       'referrer-policy': 'strict-origin-when-cross-origin',
