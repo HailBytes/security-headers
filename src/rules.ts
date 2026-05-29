@@ -50,14 +50,23 @@ export function checkHSTS(headers: RawHeaders): HeaderFinding {
   const maxAge = m ? parseInt(m[1], 10) : 0;
   if (maxAge >= 31536000) {
     score += 5;
-  } else {
+  } else if (maxAge > 0) {
     findings.push(`max-age=${maxAge} is below recommended 31536000 (1 year)`);
     recommendations.push('Set max-age=31536000');
-    if (maxAge > 0) score += 2;
+    score += 2;
+  } else {
+    // max-age=0 (or absent) explicitly revokes HSTS — the browser purges the
+    // host from its HSTS cache and stops enforcing HTTPS.
+    findings.push('max-age=0 revokes HSTS — HTTPS enforcement is disabled');
+    recommendations.push('Set max-age=31536000 to enforce HTTPS');
   }
-  if (/includesubdomains/i.test(raw)) { score += 3; }
-  else { findings.push('includeSubDomains not set'); recommendations.push('Add includeSubDomains directive'); }
-  if (/preload/i.test(raw)) score += 2;
+  // includeSubDomains / preload only add protection when HSTS is actually
+  // enforced; awarding their bonuses under max-age=0 would mask a revocation.
+  if (maxAge > 0) {
+    if (/includesubdomains/i.test(raw)) { score += 3; }
+    else { findings.push('includeSubDomains not set'); recommendations.push('Add includeSubDomains directive'); }
+    if (/preload/i.test(raw)) score += 2;
+  }
 
   return { header: 'Strict-Transport-Security', score, maxScore: 20, status: score >= 15 ? 'good' : 'warning', raw, findings, recommendations };
 }

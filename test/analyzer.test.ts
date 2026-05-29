@@ -107,6 +107,13 @@ describe('checkHSTS', () => {
     expect(r.score).toBe(20);
   });
 
+  it('max-age=0 is a revocation: warning, no includeSubDomains/preload bonus', () => {
+    const r = checkHSTS({ 'strict-transport-security': 'max-age=0; includeSubDomains; preload' });
+    expect(r.score).toBe(10);
+    expect(r.status).toBe('warning');
+    expect(r.findings.some(f => /revoke/i.test(f))).toBe(true);
+  });
+
   it('max-age between 1 and 31536000 gives partial credit', () => {
     const r = checkHSTS({ 'strict-transport-security': 'max-age=86400; includeSubDomains' });
     expect(r.score).toBeGreaterThan(10);
