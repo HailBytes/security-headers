@@ -105,6 +105,13 @@ export function checkCSP(headers: RawHeaders): HeaderFinding {
     findings.push('Wildcard (*) in default-src or script-src allows any origin');
     recommendations.push('Replace wildcards with specific trusted domains');
   }
+  // form-action does NOT inherit from default-src, so its absence leaves form
+  // submissions unrestricted even under a strict default-src 'self'.
+  if (extractCspDirective(raw, 'form-action') === undefined) {
+    score -= 3;
+    findings.push('No form-action directive — form submissions are unrestricted (form-action does not inherit from default-src)');
+    recommendations.push("Add form-action 'self' (or 'none') to restrict where forms can submit");
+  }
   score = Math.max(5, score); // at least 5 for having any CSP
 
   return { header: 'Content-Security-Policy', score, maxScore: 30, status: findings.length === 0 ? 'good' : 'warning', raw, findings, recommendations };

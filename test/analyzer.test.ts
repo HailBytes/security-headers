@@ -8,7 +8,7 @@ import {
 
 const STRONG_HEADERS = {
   'strict-transport-security': 'max-age=31536000; includeSubDomains; preload',
-  'content-security-policy': "default-src 'self'; img-src *",
+  'content-security-policy': "default-src 'self'; img-src *; form-action 'self'",
   'x-frame-options': 'DENY',
   'x-content-type-options': 'nosniff',
   'referrer-policy': 'strict-origin-when-cross-origin',
@@ -128,7 +128,7 @@ describe('checkCSP', () => {
 
   it('enforcing CSP takes precedence over report-only', () => {
     const r = checkCSP({
-      'content-security-policy': "default-src 'self'",
+      'content-security-policy': "default-src 'self'; form-action 'self'",
       'content-security-policy-report-only': "default-src *",
     });
     expect(r.score).toBe(20);
@@ -158,7 +158,7 @@ describe('checkCSP', () => {
   });
 
   it("does not penalize 'unsafe-inline' when 'strict-dynamic' + nonce present", () => {
-    const r = checkCSP({ 'content-security-policy': "script-src 'strict-dynamic' 'nonce-abc123' 'unsafe-inline' https://example.com" });
+    const r = checkCSP({ 'content-security-policy': "script-src 'strict-dynamic' 'nonce-abc123' 'unsafe-inline' https://example.com; form-action 'self'" });
     expect(r.findings.some(f => f.includes('unsafe-inline'))).toBe(false);
     expect(r.score).toBe(20);
   });
@@ -169,13 +169,26 @@ describe('checkCSP', () => {
   });
 
   it('clean CSP returns score 20', () => {
+    const r = checkCSP({ 'content-security-policy': "default-src 'self'; form-action 'self'" });
+    expect(r.score).toBe(20);
+  });
+
+  it('flags missing form-action directive', () => {
     const r = checkCSP({ 'content-security-policy': "default-src 'self'" });
+    expect(r.findings.some(f => /form-action/i.test(f))).toBe(true);
+    expect(r.status).toBe('warning');
+    expect(r.score).toBe(17);
+  });
+
+  it("form-action 'none' satisfies the form-action check", () => {
+    const r = checkCSP({ 'content-security-policy': "default-src 'self'; form-action 'none'" });
+    expect(r.findings.some(f => /form-action/i.test(f))).toBe(false);
     expect(r.score).toBe(20);
   });
 
   it('CSP with both unsafe-inline and unsafe-eval scores 10', () => {
     // 20 - 5 - 5 = 10, which is above the floor of 5
-    const r = checkCSP({ 'content-security-policy': "default-src 'unsafe-inline' 'unsafe-eval'" });
+    const r = checkCSP({ 'content-security-policy': "default-src 'unsafe-inline' 'unsafe-eval'; form-action 'self'" });
     expect(r.score).toBe(10);
   });
 
@@ -410,7 +423,7 @@ describe('grade boundaries', () => {
   it('A+ at 90%', () => {
     const headers = {
       'strict-transport-security': 'max-age=31536000; includeSubDomains; preload',
-      'content-security-policy': "default-src 'self'",
+      'content-security-policy': "default-src 'self'; form-action 'self'",
       'x-frame-options': 'DENY',
       'x-content-type-options': 'nosniff',
       'referrer-policy': 'strict-origin-when-cross-origin',
@@ -429,7 +442,7 @@ describe('grade boundaries', () => {
     // Let's use stricter combo: missing permissions-policy too
     const headers = {
       'strict-transport-security': 'max-age=31536000; includeSubDomains',
-      'content-security-policy': "default-src 'self'",
+      'content-security-policy': "default-src 'self'; form-action 'self'",
       'x-frame-options': 'DENY',
       'x-content-type-options': 'nosniff',
       'referrer-policy': 'strict-origin-when-cross-origin',
@@ -445,7 +458,7 @@ describe('grade boundaries', () => {
   it('B at 60%', () => {
     const headers = {
       'strict-transport-security': 'max-age=31536000; includeSubDomains',
-      'content-security-policy': "default-src 'self'",
+      'content-security-policy': "default-src 'self'; form-action 'self'",
       'x-frame-options': 'DENY',
       'x-content-type-options': 'nosniff',
       'referrer-policy': 'strict-origin-when-cross-origin',
