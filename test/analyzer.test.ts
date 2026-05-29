@@ -58,7 +58,13 @@ describe('analyze convenience function', () => {
   it('analyze with object returns same result as analyzeHeaders', async () => {
     const direct = analyzeHeaders(STRONG_HEADERS);
     const viaAnalyze = await analyze(STRONG_HEADERS);
-    expect(viaAnalyze).toEqual(direct);
+    // analyzedAt is wall-clock and is computed independently in each call, so
+    // compare everything else and assert both timestamps are valid ISO strings.
+    const { analyzedAt: directAt, ...directRest } = direct;
+    const { analyzedAt: viaAt, ...viaRest } = viaAnalyze;
+    expect(viaRest).toEqual(directRest);
+    expect(directAt).toMatch(/^\d{4}-\d{2}-\d{2}T/);
+    expect(viaAt).toMatch(/^\d{4}-\d{2}-\d{2}T/);
   });
 
   it('analyze with empty object returns grade F', async () => {
@@ -273,22 +279,28 @@ describe('checkPermissionsPolicy', () => {
   });
 
   it('falls back to feature-policy header', () => {
-    const r = checkPermissionsPolicy({ 'feature-policy': 'camera *' });
+    const r = checkPermissionsPolicy({ 'feature-policy': 'camera=(), microphone=(), geolocation=()' });
     expect(r.score).toBe(10);
     expect(r.status).toBe('good');
   });
 
   it('permissions-policy takes precedence over feature-policy', () => {
     const r = checkPermissionsPolicy({
-      'permissions-policy': 'camera=()',
+      'permissions-policy': 'camera=(), microphone=(), geolocation=()',
       'feature-policy': 'camera *',
     });
     expect(r.score).toBe(10);
-    expect(r.raw).toBe('camera=()');
+    expect(r.raw).toBe('camera=(), microphone=(), geolocation=()');
+  });
+
+  it('partial policy (camera only) returns warning, not full score', () => {
+    const r = checkPermissionsPolicy({ 'permissions-policy': 'camera=()' });
+    expect(r.score).toBe(5);
+    expect(r.status).toBe('warning');
   });
 
   it('case-insensitive header name matching', () => {
-    const r = checkPermissionsPolicy({ 'Permissions-Policy': 'camera=()' });
+    const r = checkPermissionsPolicy({ 'Permissions-Policy': 'camera=(), microphone=(), geolocation=()' });
     expect(r.score).toBe(10);
   });
 });
@@ -344,7 +356,7 @@ describe('grade boundaries', () => {
       'x-frame-options': 'DENY',
       'x-content-type-options': 'nosniff',
       'referrer-policy': 'strict-origin-when-cross-origin',
-      'permissions-policy': 'camera=()',
+      'permissions-policy': 'camera=(), microphone=(), geolocation=()',
       'cross-origin-embedder-policy': 'require-corp',
       'cross-origin-opener-policy': 'same-origin',
       'cross-origin-resource-policy': 'same-origin',
