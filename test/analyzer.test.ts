@@ -307,9 +307,10 @@ describe('checkReferrerPolicy', () => {
     expect(r.score).toBe(10);
   });
 
-  it('no-referrer-when-downgrade is strong', () => {
+  it('no-referrer-when-downgrade is not strong (leaks full URL cross-origin)', () => {
     const r = checkReferrerPolicy({ 'referrer-policy': 'no-referrer-when-downgrade' });
-    expect(r.score).toBe(10);
+    expect(r.score).toBe(5);
+    expect(r.status).toBe('warning');
   });
 
   it('unsafe-url returns score 5', () => {

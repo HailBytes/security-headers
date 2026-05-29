@@ -172,7 +172,10 @@ export function checkReferrerPolicy(headers: RawHeaders): HeaderFinding {
     findings: ['Referrer-Policy not set — browser default may leak URLs in Referer header'],
     recommendations: ['Add Referrer-Policy: strict-origin-when-cross-origin'],
   };
-  const strongValues = ['no-referrer', 'strict-origin', 'strict-origin-when-cross-origin', 'no-referrer-when-downgrade', 'same-origin'];
+  // no-referrer-when-downgrade is intentionally excluded: it sends the full URL
+  // (path + query) to every cross-origin HTTPS destination. It was the historical
+  // browser default precisely because it was the least restrictive option.
+  const strongValues = ['no-referrer', 'strict-origin', 'strict-origin-when-cross-origin', 'same-origin'];
   const isStrong = strongValues.includes(raw.toLowerCase().trim());
   const score = isStrong ? 10 : 5;
   return { header: 'Referrer-Policy', score, maxScore: 10, status: isStrong ? 'good' : 'warning', raw,
