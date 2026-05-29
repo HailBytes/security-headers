@@ -175,6 +175,29 @@ describe('checkCSP', () => {
     expect(r.findings.some(f => f.includes('unsafe-inline'))).toBe(true);
   });
 
+  it('detects wildcard in connect-src', () => {
+    const r = checkCSP({ 'content-security-policy': "default-src 'self'; form-action 'self'; connect-src *" });
+    expect(r.findings.some(f => /Wildcard.*connect-src/i.test(f))).toBe(true);
+    expect(r.score).toBe(15);
+  });
+
+  it('detects wildcard in form-action', () => {
+    const r = checkCSP({ 'content-security-policy': "default-src 'self'; form-action *" });
+    expect(r.findings.some(f => /Wildcard.*form-action/i.test(f))).toBe(true);
+  });
+
+  it("detects mid-policy wildcard (default-src 'self' *)", () => {
+    const r = checkCSP({ 'content-security-policy': "default-src 'self' *; form-action 'self'" });
+    expect(r.findings.some(f => /Wildcard/i.test(f))).toBe(true);
+    expect(r.score).toBe(15);
+  });
+
+  it('does not flag a wildcard in low-risk img-src', () => {
+    const r = checkCSP({ 'content-security-policy': "default-src 'self'; form-action 'self'; img-src *" });
+    expect(r.findings.some(f => /Wildcard/i.test(f))).toBe(false);
+    expect(r.score).toBe(20);
+  });
+
   it('clean CSP returns score 20', () => {
     const r = checkCSP({ 'content-security-policy': "default-src 'self'; form-action 'self'" });
     expect(r.score).toBe(20);

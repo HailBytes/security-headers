@@ -109,9 +109,18 @@ export function checkCSP(headers: RawHeaders): HeaderFinding {
     findings.push("'unsafe-eval' allows eval() — potential code injection");
     recommendations.push("Remove 'unsafe-eval'");
   }
-  if (/(?:default-src|script-src)\s+\*/i.test(raw)) {
+  // Check a wildcard (*) source anywhere in the source list of any sensitive
+  // fetch/navigation directive — not just as the first token of default-src/
+  // script-src. img-src/style-src/font-src/media-src are intentionally omitted
+  // as a wildcard there is low-risk and commonly legitimate.
+  const wildcardDirectives = ['default-src', 'script-src', 'connect-src', 'form-action', 'frame-src', 'worker-src'];
+  const wildcarded = wildcardDirectives.filter(d => {
+    const sources = extractCspDirective(raw, d);
+    return sources !== undefined && sources.includes('*');
+  });
+  if (wildcarded.length > 0) {
     score -= 5;
-    findings.push('Wildcard (*) in default-src or script-src allows any origin');
+    findings.push(`Wildcard (*) source in ${wildcarded.join(', ')} allows any origin`);
     recommendations.push('Replace wildcards with specific trusted domains');
   }
   // form-action does NOT inherit from default-src, so its absence leaves form
