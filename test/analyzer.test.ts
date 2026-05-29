@@ -141,6 +141,17 @@ describe('checkCSP', () => {
     expect(r.findings.some(f => f.includes('Wildcard'))).toBe(true);
   });
 
+  it("does not penalize 'unsafe-inline' when 'strict-dynamic' + nonce present", () => {
+    const r = checkCSP({ 'content-security-policy': "script-src 'strict-dynamic' 'nonce-abc123' 'unsafe-inline' https://example.com" });
+    expect(r.findings.some(f => f.includes('unsafe-inline'))).toBe(false);
+    expect(r.score).toBe(20);
+  });
+
+  it("still penalizes 'unsafe-inline' when 'strict-dynamic' present without nonce/hash", () => {
+    const r = checkCSP({ 'content-security-policy': "script-src 'strict-dynamic' 'unsafe-inline'" });
+    expect(r.findings.some(f => f.includes('unsafe-inline'))).toBe(true);
+  });
+
   it('clean CSP returns score 20', () => {
     const r = checkCSP({ 'content-security-policy': "default-src 'self'" });
     expect(r.score).toBe(20);
