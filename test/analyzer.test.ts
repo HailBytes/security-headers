@@ -194,6 +194,25 @@ describe('checkXFrameOptions', () => {
     expect(r.status).toBe('good');
   });
 
+  it("CSP frame-ancestors 'self' with specific origins is protective", () => {
+    const r = checkXFrameOptions({ 'content-security-policy': "frame-ancestors 'self' https://trusted.example" });
+    expect(r.score).toBe(15);
+    expect(r.status).toBe('good');
+  });
+
+  it('CSP frame-ancestors * is not protective', () => {
+    const r = checkXFrameOptions({ 'content-security-policy': 'frame-ancestors *' });
+    expect(r.score).toBe(8);
+    expect(r.status).toBe('warning');
+    expect(r.findings.some(f => /any origin/i.test(f))).toBe(true);
+  });
+
+  it('CSP frame-ancestors with bare scheme (https:) is not protective', () => {
+    const r = checkXFrameOptions({ 'content-security-policy': 'frame-ancestors https:' });
+    expect(r.score).toBe(8);
+    expect(r.status).toBe('warning');
+  });
+
   it('case-insensitive header name matching', () => {
     const r = checkXFrameOptions({ 'X-Frame-Options': 'DENY' });
     expect(r.score).toBe(15);

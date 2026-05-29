@@ -10,6 +10,30 @@ function getHeader(headers: RawHeaders, name: string): string | undefined {
   return undefined;
 }
 
+/**
+ * Returns the source tokens of a CSP directive, or undefined if the directive
+ * is absent. e.g. extractCspDirective("default-src 'self'; frame-ancestors 'none'", 'frame-ancestors')
+ * => ["'none'"].
+ */
+function extractCspDirective(csp: string, directive: string): string[] | undefined {
+  const lower = directive.toLowerCase();
+  for (const part of csp.split(';')) {
+    const tokens = part.trim().split(/\s+/);
+    if (tokens.length && tokens[0].toLowerCase() === lower) {
+      return tokens.slice(1);
+    }
+  }
+  return undefined;
+}
+
+/**
+ * A source token offers no host restriction if it is a bare wildcard (`*`) or a
+ * scheme-only source (`https:`, `http:`, `data:`, etc.) that matches any host.
+ */
+function isPermissiveSource(token: string): boolean {
+  return token === '*' || /^[a-z][a-z0-9+.-]*:$/i.test(token);
+}
+
 export function checkHSTS(headers: RawHeaders): HeaderFinding {
   const raw = getHeader(headers, 'strict-transport-security');
   if (!raw) return {
@@ -73,15 +97,30 @@ export function checkCSP(headers: RawHeaders): HeaderFinding {
 export function checkXFrameOptions(headers: RawHeaders): HeaderFinding {
   const raw = getHeader(headers, 'x-frame-options');
   const csp = getHeader(headers, 'content-security-policy');
-  const cspFrameAncestors = csp && /frame-ancestors/i.test(csp);
+  const frameAncestors = csp ? extractCspDirective(csp, 'frame-ancestors') : undefined;
+  const hasFrameAncestors = frameAncestors !== undefined;
+  // A frame-ancestors directive only protects if it actually restricts origins.
+  // `frame-ancestors *` / `frame-ancestors https:` allow embedding by any origin.
+  const frameAncestorsProtective =
+    hasFrameAncestors && frameAncestors!.length > 0 && !frameAncestors!.some(isPermissiveSource);
 
-  if (!raw && !cspFrameAncestors) return {
+  if (!raw && !hasFrameAncestors) return {
     header: 'X-Frame-Options', score: 0, maxScore: 15, status: 'missing',
     findings: ['Site may be embeddable in iframes — clickjacking risk'],
     recommendations: ['Add X-Frame-Options: DENY or SAMEORIGIN, or use CSP frame-ancestors'],
   };
-  if (cspFrameAncestors) {
+  if (frameAncestorsProtective) {
     return { header: 'X-Frame-Options', score: 15, maxScore: 15, status: 'good', raw: raw ?? '(set via CSP frame-ancestors)', findings: [], recommendations: [] };
+  }
+  // frame-ancestors present but permissive (e.g. `*`). Per CSP spec it takes
+  // precedence over X-Frame-Options, so it cannot be relied on for protection.
+  if (hasFrameAncestors && !frameAncestorsProtective) {
+    return {
+      header: 'X-Frame-Options', score: 8, maxScore: 15, status: 'warning',
+      raw: raw ?? `(CSP frame-ancestors ${frameAncestors!.join(' ') || '<empty>'})`,
+      findings: ['CSP frame-ancestors allows embedding by any origin — no clickjacking protection'],
+      recommendations: ["Restrict frame-ancestors to 'none', 'self', or specific trusted origins"],
+    };
   }
   const val = (raw ?? '').toUpperCase().trim();
   const score = (val === 'DENY' || val === 'SAMEORIGIN') ? 15 : 8;
