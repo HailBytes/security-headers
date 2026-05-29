@@ -119,6 +119,22 @@ describe('checkCSP', () => {
     expect(checkCSP({}).score).toBe(0);
   });
 
+  it('report-only CSP gets partial credit and a warning, not missing', () => {
+    const r = checkCSP({ 'content-security-policy-report-only': "default-src 'self'" });
+    expect(r.status).toBe('warning');
+    expect(r.score).toBe(10);
+    expect(r.findings.some(f => /report-only/i.test(f))).toBe(true);
+  });
+
+  it('enforcing CSP takes precedence over report-only', () => {
+    const r = checkCSP({
+      'content-security-policy': "default-src 'self'",
+      'content-security-policy-report-only': "default-src *",
+    });
+    expect(r.score).toBe(20);
+    expect(r.status).toBe('good');
+  });
+
   it('detects unsafe-inline', () => {
     const r = checkCSP({ 'content-security-policy': "default-src 'self'; script-src 'unsafe-inline'" });
     expect(r.findings.some(f => f.includes('unsafe-inline'))).toBe(true);

@@ -64,11 +64,22 @@ export function checkHSTS(headers: RawHeaders): HeaderFinding {
 
 export function checkCSP(headers: RawHeaders): HeaderFinding {
   const raw = getHeader(headers, 'content-security-policy');
-  if (!raw) return {
-    header: 'Content-Security-Policy', score: 0, maxScore: 30, status: 'missing',
-    findings: ['CSP header not present — XSS attacks are not mitigated'],
-    recommendations: ["Add a Content-Security-Policy header. Start with: default-src 'self'"],
-  };
+  if (!raw) {
+    // A report-only policy is the standard incremental-rollout pattern. It does
+    // not enforce anything, so it can't earn full credit, but it is materially
+    // different from having no CSP at all and deserves targeted feedback.
+    const reportOnly = getHeader(headers, 'content-security-policy-report-only');
+    if (reportOnly) return {
+      header: 'Content-Security-Policy', score: 10, maxScore: 30, status: 'warning', raw: reportOnly,
+      findings: ['CSP is report-only — violations are reported but not enforced, so it does not mitigate XSS'],
+      recommendations: ['Promote the policy to an enforcing Content-Security-Policy header once validated'],
+    };
+    return {
+      header: 'Content-Security-Policy', score: 0, maxScore: 30, status: 'missing',
+      findings: ['CSP header not present — XSS attacks are not mitigated'],
+      recommendations: ["Add a Content-Security-Policy header. Start with: default-src 'self'"],
+    };
+  }
 
   let score = 20;
   const findings: string[] = [];
