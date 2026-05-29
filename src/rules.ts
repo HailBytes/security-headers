@@ -177,7 +177,7 @@ export function checkPermissionsPolicy(headers: RawHeaders): HeaderFinding {
     status: isGood ? "good" : "warning",
     raw,
     findings: isGood ? [] : ["Permissions-Policy does not restrict at least camera, microphone, and geolocation"],
-    recommendations: ["Set Permissions-Policy to camera=(), microphone=(), geolocation=(), and any other features needed by your app"]
+    recommendations: isGood ? [] : ["Set Permissions-Policy to camera=(), microphone=(), geolocation=(), and any other features needed by your app"]
   };
 }
 

@@ -318,6 +318,18 @@ describe('checkPermissionsPolicy', () => {
     expect(r.status).toBe('warning');
   });
 
+  it('good policy emits no recommendations', () => {
+    const r = checkPermissionsPolicy({ 'permissions-policy': 'camera=(), microphone=(), geolocation=()' });
+    expect(r.status).toBe('good');
+    expect(r.findings).toEqual([]);
+    expect(r.recommendations).toEqual([]);
+  });
+
+  it('warning policy still emits a recommendation', () => {
+    const r = checkPermissionsPolicy({ 'permissions-policy': 'camera=()' });
+    expect(r.recommendations.length).toBeGreaterThan(0);
+  });
+
   it('case-insensitive header name matching', () => {
     const r = checkPermissionsPolicy({ 'Permissions-Policy': 'camera=(), microphone=(), geolocation=()' });
     expect(r.score).toBe(10);
