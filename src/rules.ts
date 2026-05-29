@@ -229,19 +229,38 @@ export function checkCrossOriginPolicies(headers: RawHeaders): HeaderFinding {
   const coep = getHeader(headers, 'cross-origin-embedder-policy');
   const coop = getHeader(headers, 'cross-origin-opener-policy');
   const corp = getHeader(headers, 'cross-origin-resource-policy');
-  const count = [coep, coop, corp].filter(Boolean).length;
-  const score = Math.min(count * 2, 5);
-  const missing = [
-    !coep && 'Cross-Origin-Embedder-Policy',
-    !coop && 'Cross-Origin-Opener-Policy',
-    !corp && 'Cross-Origin-Resource-Policy',
-  ].filter(Boolean) as string[];
 
+  const norm = (v?: string) => v?.toLowerCase().trim() ?? '';
+  // Only restrictive values provide isolation. The defaults (unsafe-none / the
+  // permissive cross-origin) explicitly opt out and earn no credit.
+  const coepOk = ['require-corp', 'credentialless'].includes(norm(coep));
+  const coopOk = ['same-origin', 'same-origin-allow-popups'].includes(norm(coop));
+  const corpOk = ['same-origin', 'same-site'].includes(norm(corp));
+
+  const protective = [coepOk, coopOk, corpOk].filter(Boolean).length;
+  const score = Math.min(protective * 2, 5);
+
+  const findings: string[] = [];
+  const recommendations: string[] = [];
+  const consider = (val: string | undefined, ok: boolean, name: string, recommended: string) => {
+    if (!val) {
+      findings.push(`${name} not set`);
+      recommendations.push(`Add ${name}: ${recommended}`);
+    } else if (!ok) {
+      findings.push(`${name}: '${val}' provides no cross-origin isolation`);
+      recommendations.push(`Set ${name}: ${recommended}`);
+    }
+  };
+  consider(coep, coepOk, 'Cross-Origin-Embedder-Policy', 'require-corp');
+  consider(coop, coopOk, 'Cross-Origin-Opener-Policy', 'same-origin');
+  consider(corp, corpOk, 'Cross-Origin-Resource-Policy', 'same-origin');
+
+  const anyPresent = Boolean(coep || coop || corp);
   return {
     header: 'Cross-Origin Policies', score, maxScore: 5,
-    status: score >= 4 ? 'good' : score > 0 ? 'warning' : 'missing',
+    status: score >= 4 ? 'good' : (score > 0 || anyPresent) ? 'warning' : 'missing',
     raw: [coep && `COEP: ${coep}`, coop && `COOP: ${coop}`, corp && `CORP: ${corp}`].filter(Boolean).join('; ') || undefined,
-    findings: missing.map(h => `${h} not set`),
-    recommendations: missing.map(h => `Add ${h}`),
+    findings,
+    recommendations,
   };
 }

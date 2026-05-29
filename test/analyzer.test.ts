@@ -439,6 +439,31 @@ describe('checkCrossOriginPolicies', () => {
     expect(r.status).toBe('good');
   });
 
+  it('permissive values (unsafe-none / cross-origin) earn no credit', () => {
+    const r = checkCrossOriginPolicies({
+      'cross-origin-embedder-policy': 'unsafe-none',
+      'cross-origin-opener-policy': 'unsafe-none',
+      'cross-origin-resource-policy': 'cross-origin',
+    });
+    expect(r.score).toBe(0);
+    expect(r.status).toBe('warning');
+    expect(r.findings.every(f => /no cross-origin isolation/i.test(f))).toBe(true);
+  });
+
+  it('mixed: only protective values count', () => {
+    const r = checkCrossOriginPolicies({
+      'cross-origin-opener-policy': 'same-origin',     // protective
+      'cross-origin-resource-policy': 'cross-origin',  // permissive
+    });
+    expect(r.score).toBe(2);
+    expect(r.status).toBe('warning');
+  });
+
+  it('COOP same-origin-allow-popups counts as protective', () => {
+    const r = checkCrossOriginPolicies({ 'cross-origin-opener-policy': 'same-origin-allow-popups' });
+    expect(r.score).toBe(2);
+  });
+
   it('includes raw values in output', () => {
     const r = checkCrossOriginPolicies({ 'cross-origin-opener-policy': 'same-origin' });
     expect(r.raw).toContain('COOP: same-origin');
