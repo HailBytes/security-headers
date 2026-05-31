@@ -130,6 +130,14 @@ export function checkCSP(headers: RawHeaders): HeaderFinding {
     findings.push('No form-action directive — form submissions are unrestricted (form-action does not inherit from default-src)');
     recommendations.push("Add form-action 'self' (or 'none') to restrict where forms can submit");
   }
+  // base-uri does NOT inherit from default-src. Without it an attacker who can
+  // inject a <base> element can redirect relative URLs — including relative-URL
+  // nonce sources — to an attacker-controlled host (base-uri injection attack).
+  if (extractCspDirective(raw, 'base-uri') === undefined) {
+    score -= 2;
+    findings.push("No base-uri directive — <base> injection can redirect relative nonce sources (base-uri does not inherit from default-src)");
+    recommendations.push("Add base-uri 'self' or base-uri 'none' to prevent <base> injection");
+  }
   score = Math.max(5, score); // at least 5 for having any CSP
 
   return { header: 'Content-Security-Policy', score, maxScore: 30, status: findings.length === 0 ? 'good' : 'warning', raw, findings, recommendations };
