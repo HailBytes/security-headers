@@ -138,8 +138,8 @@ describe('checkCSP', () => {
       'content-security-policy': "default-src 'self'; form-action 'self'",
       'content-security-policy-report-only': "default-src *",
     });
-    expect(r.score).toBe(20);
-    expect(r.status).toBe('good');
+    expect(r.score).toBe(18);
+    expect(r.status).toBe('warning');
   });
 
   it('detects unsafe-inline', () => {
@@ -165,7 +165,7 @@ describe('checkCSP', () => {
   });
 
   it("does not penalize 'unsafe-inline' when 'strict-dynamic' + nonce present", () => {
-    const r = checkCSP({ 'content-security-policy': "script-src 'strict-dynamic' 'nonce-abc123' 'unsafe-inline' https://example.com; form-action 'self'" });
+    const r = checkCSP({ 'content-security-policy': "script-src 'strict-dynamic' 'nonce-abc123' 'unsafe-inline' https://example.com; form-action 'self'; base-uri 'none'" });
     expect(r.findings.some(f => f.includes('unsafe-inline'))).toBe(false);
     expect(r.score).toBe(20);
   });
@@ -178,7 +178,7 @@ describe('checkCSP', () => {
   it('detects wildcard in connect-src', () => {
     const r = checkCSP({ 'content-security-policy': "default-src 'self'; form-action 'self'; connect-src *" });
     expect(r.findings.some(f => /Wildcard.*connect-src/i.test(f))).toBe(true);
-    expect(r.score).toBe(15);
+    expect(r.score).toBe(13);
   });
 
   it('detects wildcard in form-action', () => {
@@ -189,43 +189,63 @@ describe('checkCSP', () => {
   it("detects mid-policy wildcard (default-src 'self' *)", () => {
     const r = checkCSP({ 'content-security-policy': "default-src 'self' *; form-action 'self'" });
     expect(r.findings.some(f => /Wildcard/i.test(f))).toBe(true);
-    expect(r.score).toBe(15);
+    expect(r.score).toBe(13);
   });
 
   it('does not flag a wildcard in low-risk img-src', () => {
     const r = checkCSP({ 'content-security-policy': "default-src 'self'; form-action 'self'; img-src *" });
     expect(r.findings.some(f => /Wildcard/i.test(f))).toBe(false);
-    expect(r.score).toBe(20);
+    expect(r.score).toBe(18);
   });
 
   it('clean CSP returns score 20', () => {
-    const r = checkCSP({ 'content-security-policy': "default-src 'self'; form-action 'self'" });
+    const r = checkCSP({ 'content-security-policy': "default-src 'self'; form-action 'self'; base-uri 'self'" });
     expect(r.score).toBe(20);
+    expect(r.status).toBe('good');
   });
 
   it('flags missing form-action directive', () => {
     const r = checkCSP({ 'content-security-policy': "default-src 'self'" });
     expect(r.findings.some(f => /form-action/i.test(f))).toBe(true);
     expect(r.status).toBe('warning');
-    expect(r.score).toBe(17);
+    expect(r.score).toBe(15);
   });
 
   it("form-action 'none' satisfies the form-action check", () => {
-    const r = checkCSP({ 'content-security-policy': "default-src 'self'; form-action 'none'" });
+    const r = checkCSP({ 'content-security-policy': "default-src 'self'; form-action 'none'; base-uri 'none'" });
     expect(r.findings.some(f => /form-action/i.test(f))).toBe(false);
     expect(r.score).toBe(20);
   });
 
-  it('CSP with both unsafe-inline and unsafe-eval scores 10', () => {
-    // 20 - 5 - 5 = 10, which is above the floor of 5
+  it('CSP with both unsafe-inline and unsafe-eval scores 8', () => {
+    // 20 - 5 (unsafe-inline) - 5 (unsafe-eval) - 2 (no base-uri) = 8, above the floor of 5
     const r = checkCSP({ 'content-security-policy': "default-src 'unsafe-inline' 'unsafe-eval'; form-action 'self'" });
-    expect(r.score).toBe(10);
+    expect(r.score).toBe(8);
   });
 
   it('minimum score for any CSP is 5', () => {
     // 20 - 5 (unsafe-inline) - 5 (unsafe-eval) - 5 (wildcard) = 5, floor is 5
     const r = checkCSP({ 'content-security-policy': "default-src * 'unsafe-inline' 'unsafe-eval'" });
     expect(r.score).toBe(5);
+  });
+
+  it('flags missing base-uri directive', () => {
+    const r = checkCSP({ 'content-security-policy': "default-src 'self'; form-action 'self'" });
+    expect(r.findings.some(f => /base-uri/i.test(f))).toBe(true);
+    expect(r.status).toBe('warning');
+    expect(r.score).toBe(18);
+  });
+
+  it("base-uri 'none' satisfies the base-uri check", () => {
+    const r = checkCSP({ 'content-security-policy': "default-src 'self'; form-action 'self'; base-uri 'none'" });
+    expect(r.findings.some(f => /base-uri/i.test(f))).toBe(false);
+    expect(r.score).toBe(20);
+  });
+
+  it("base-uri 'self' satisfies the base-uri check", () => {
+    const r = checkCSP({ 'content-security-policy': "default-src 'self'; form-action 'self'; base-uri 'self'" });
+    expect(r.findings.some(f => /base-uri/i.test(f))).toBe(false);
+    expect(r.score).toBe(20);
   });
 });
 
@@ -479,7 +499,7 @@ describe('grade boundaries', () => {
   it('A+ at 90%', () => {
     const headers = {
       'strict-transport-security': 'max-age=31536000; includeSubDomains; preload',
-      'content-security-policy': "default-src 'self'; form-action 'self'",
+      'content-security-policy': "default-src 'self'; form-action 'self'; base-uri 'self'",
       'x-frame-options': 'DENY',
       'x-content-type-options': 'nosniff',
       'referrer-policy': 'strict-origin-when-cross-origin',
