@@ -181,6 +181,11 @@ describe('checkCSP', () => {
     expect(r.score).toBe(13);
   });
 
+  it('detects wildcard in object-src', () => {
+    const r = checkCSP({ 'content-security-policy': "default-src 'self'; script-src 'self'; object-src *; form-action 'self'" });
+    expect(r.findings.some(f => /Wildcard.*object-src/i.test(f))).toBe(true);
+  });
+
   it('detects wildcard in form-action', () => {
     const r = checkCSP({ 'content-security-policy': "default-src 'self'; form-action *" });
     expect(r.findings.some(f => /Wildcard.*form-action/i.test(f))).toBe(true);
