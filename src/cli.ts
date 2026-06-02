@@ -15,6 +15,9 @@ const YLW = '\x1b[33m';
 const GRADE_COLOR: Record<string, string> = {
   'A+': '\x1b[92m', A: GRN, B: YLW, C: YLW, D: RED, F: '\x1b[91m',
 };
+// Numeric rank so grade comparisons are order-independent string operations.
+const GRADE_RANK: Record<string, number> = { 'A+': 6, A: 5, B: 4, C: 3, D: 2, F: 1 };
+const VALID_GRADES = ['A+', 'A', 'B', 'C', 'D', 'F'];
 const STATUS_ICON: Record<string, string> = {
   good: `${GRN}✓${R}`, warning: `${YLW}⚠${R}`, missing: `${RED}✗${R}`, error: `${RED}✗${R}`,
 };
@@ -37,15 +40,18 @@ function printHelp() {
   console.log('  npx @hailbytes/security-headers <url> [options]');
   console.log('');
   console.log(`${B}Options:${R}`);
-  console.log('  --json        Output report as JSON');
-  console.log('  --timeout ms  Fetch timeout in milliseconds (default: 10000)');
-  console.log('  --version     Print version and exit');
-  console.log('  --help        Print this help and exit');
+  console.log('  --json             Output report as JSON');
+  console.log('  --timeout ms       Fetch timeout in milliseconds (default: 10000)');
+  console.log('  --min-grade grade  Exit 1 if grade is below this threshold (default: C)');
+  console.log('                     Valid grades: A+, A, B, C, D, F');
+  console.log('  --version          Print version and exit');
+  console.log('  --help             Print this help and exit');
   console.log('');
   console.log(`${B}Examples:${R}`);
   console.log('  security-headers https://example.com');
   console.log('  security-headers https://example.com --json');
   console.log('  security-headers https://example.com --timeout 5000');
+  console.log('  security-headers https://example.com --min-grade B');
   console.log('  security-headers https://staging.example.com || echo "Gate failed"');
 }
 
@@ -82,7 +88,19 @@ async function main() {
   const jsonMode = args.includes('--json');
   const timeoutArg = args.find((a, i) => a === '--timeout' && args[i + 1]);
   const timeoutMs = timeoutArg ? parseInt(args[args.indexOf('--timeout') + 1], 10) : undefined;
-  const url = args.find(a => !a.startsWith('--') && a !== String(timeoutMs));
+
+  const minGradeArg = args.find((a, i) => a === '--min-grade' && args[i + 1]);
+  const rawMinGrade = minGradeArg ? args[args.indexOf('--min-grade') + 1].toUpperCase() : 'C';
+  // Normalise lowercase 'a+' -> 'A+' etc., but also accept 'a' -> 'A'.
+  const minGrade = rawMinGrade === 'A+' ? 'A+' : rawMinGrade.charAt(0);
+  const resolvedMinGrade = VALID_GRADES.includes(rawMinGrade) ? rawMinGrade : (VALID_GRADES.includes(minGrade) ? minGrade : null);
+  if (!resolvedMinGrade) {
+    console.error(`Invalid --min-grade value '${rawMinGrade}'. Valid grades: ${VALID_GRADES.join(', ')}`);
+    process.exit(1);
+  }
+
+  const knownValueArgs = new Set([String(timeoutMs), resolvedMinGrade, rawMinGrade]);
+  const url = args.find(a => !a.startsWith('--') && !knownValueArgs.has(a));
   if (!url) {
     console.error('Usage: security-headers <url> [--json] [--timeout ms] [--help] [--version]');
     console.error('Run with --help for full usage information.');
@@ -92,7 +110,7 @@ async function main() {
     const report = await analyze(url, timeoutMs !== undefined ? { timeoutMs } : undefined);
     if (jsonMode) { console.log(JSON.stringify(report, null, 2)); }
     else { printReport(report); }
-    if (report.grade === 'D' || report.grade === 'F') process.exit(1);
+    if ((GRADE_RANK[report.grade] ?? 0) < (GRADE_RANK[resolvedMinGrade] ?? 0)) process.exit(1);
   } catch (err) {
     console.error(`Error: ${(err as Error).message}`);
     process.exit(1);
