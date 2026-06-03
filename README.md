@@ -37,8 +37,11 @@ npx @hailbytes/security-headers https://example.com
 # Output raw JSON
 npx @hailbytes/security-headers https://example.com --json
 
-# Use as a CI gate (exits 1 on grade D or F)
+# Use as a CI gate (exits 1 on grade D or F — default threshold)
 npx @hailbytes/security-headers https://staging.example.com || echo "Security headers gate failed"
+
+# Stricter CI gate: fail on C or below
+npx @hailbytes/security-headers https://staging.example.com --fail-on C
 ```
 
 ### Library — analyze a URL
