@@ -34,6 +34,12 @@ jobs:
             npm version "$TAG_VERSION" --no-git-tag-version
           fi
 
+      - name: Type-check
+        run: npm run typecheck
+
+      - name: Test
+        run: npm test
+
       - name: Build
         run: npm run build
 
