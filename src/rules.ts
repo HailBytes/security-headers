@@ -109,19 +109,19 @@ export function checkCSP(headers: RawHeaders): HeaderFinding {
     findings.push("'unsafe-eval' allows eval() — potential code injection");
     recommendations.push("Remove 'unsafe-eval'");
   }
-  // Check a wildcard (*) source anywhere in the source list of any sensitive
-  // fetch/navigation directive — not just as the first token of default-src/
-  // script-src. img-src/style-src/font-src/media-src are intentionally omitted
-  // as a wildcard there is low-risk and commonly legitimate.
+  // Check for overly permissive sources (bare wildcard `*` OR scheme-only like
+  // `https:` / `data:` which match any host) in sensitive fetch/navigation
+  // directives. img-src/style-src/font-src/media-src are intentionally omitted
+  // as a permissive source there is low-risk and commonly legitimate.
   const wildcardDirectives = ['default-src', 'script-src', 'connect-src', 'form-action', 'frame-src', 'worker-src'];
   const wildcarded = wildcardDirectives.filter(d => {
     const sources = extractCspDirective(raw, d);
-    return sources !== undefined && sources.includes('*');
+    return sources !== undefined && sources.some(isPermissiveSource);
   });
   if (wildcarded.length > 0) {
     score -= 5;
-    findings.push(`Wildcard (*) source in ${wildcarded.join(', ')} allows any origin`);
-    recommendations.push('Replace wildcards with specific trusted domains');
+    findings.push(`Overly permissive source in ${wildcarded.join(', ')} (e.g. '*' or 'https:') allows any origin`);
+    recommendations.push('Replace wildcards and scheme-only sources with specific trusted domains');
   }
   // form-action does NOT inherit from default-src, so its absence leaves form
   // submissions unrestricted even under a strict default-src 'self'.
