@@ -80,9 +80,18 @@ async function main() {
   }
 
   const jsonMode = args.includes('--json');
-  const timeoutArg = args.find((a, i) => a === '--timeout' && args[i + 1]);
-  const timeoutMs = timeoutArg ? parseInt(args[args.indexOf('--timeout') + 1], 10) : undefined;
-  const url = args.find(a => !a.startsWith('--') && a !== String(timeoutMs));
+  const timeoutIdx = args.indexOf('--timeout');
+  const rawTimeout = timeoutIdx !== -1 ? args[timeoutIdx + 1] : undefined;
+  if (timeoutIdx !== -1 && (rawTimeout === undefined || rawTimeout.startsWith('--'))) {
+    console.error('Error: --timeout requires a value in milliseconds (e.g. --timeout 5000)');
+    process.exit(1);
+  }
+  const timeoutMs = rawTimeout !== undefined ? parseInt(rawTimeout, 10) : undefined;
+  if (timeoutMs !== undefined && (isNaN(timeoutMs) || timeoutMs <= 0)) {
+    console.error(`Error: --timeout value must be a positive integer in milliseconds (e.g. --timeout 5000), got: '${rawTimeout}'`);
+    process.exit(1);
+  }
+  const url = args.find(a => !a.startsWith('--') && a !== rawTimeout);
   if (!url) {
     console.error('Usage: security-headers <url> [--json] [--timeout ms] [--help] [--version]');
     console.error('Run with --help for full usage information.');
