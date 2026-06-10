@@ -156,12 +156,29 @@ describe('checkCSP', () => {
 
   it('detects wildcard in default-src', () => {
     const r = checkCSP({ 'content-security-policy': 'default-src *' });
-    expect(r.findings.some(f => f.includes('Wildcard'))).toBe(true);
+    expect(r.findings.some(f => /Wildcard/i.test(f))).toBe(true);
   });
 
   it('detects wildcard in script-src', () => {
     const r = checkCSP({ 'content-security-policy': "default-src 'self'; script-src *" });
-    expect(r.findings.some(f => f.includes('Wildcard'))).toBe(true);
+    expect(r.findings.some(f => /Wildcard/i.test(f))).toBe(true);
+  });
+
+  it('detects scheme-only source (https:) in script-src as permissive', () => {
+    const r = checkCSP({ 'content-security-policy': "default-src 'self'; script-src https:; form-action 'self'; base-uri 'self'" });
+    expect(r.findings.some(f => /Wildcard|scheme/i.test(f))).toBe(true);
+    expect(r.score).toBe(15); // 20 - 5 for permissive script-src
+  });
+
+  it('detects scheme-only source (data:) in connect-src as permissive', () => {
+    const r = checkCSP({ 'content-security-policy': "default-src 'self'; connect-src data:; form-action 'self'; base-uri 'self'" });
+    expect(r.findings.some(f => /Wildcard|scheme/i.test(f))).toBe(true);
+  });
+
+  it('does not flag scheme-only source in low-risk img-src', () => {
+    const r = checkCSP({ 'content-security-policy': "default-src 'self'; img-src https:; form-action 'self'; base-uri 'self'" });
+    expect(r.findings.some(f => /Wildcard|scheme/i.test(f))).toBe(false);
+    expect(r.score).toBe(20);
   });
 
   it("does not penalize 'unsafe-inline' when 'strict-dynamic' + nonce present", () => {
