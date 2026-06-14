@@ -198,6 +198,22 @@ describe('checkCSP', () => {
     expect(r.score).toBe(18);
   });
 
+  it('detects bare scheme (https:) in script-src as permissive', () => {
+    const r = checkCSP({ 'content-security-policy': "default-src 'self'; script-src https:; form-action 'self'; base-uri 'self'" });
+    expect(r.findings.some(f => /Wildcard or bare-scheme/i.test(f))).toBe(true);
+    expect(r.score).toBeLessThan(20);
+  });
+
+  it('detects bare scheme (https:) in default-src as permissive', () => {
+    const r = checkCSP({ 'content-security-policy': "default-src https:" });
+    expect(r.findings.some(f => /Wildcard or bare-scheme/i.test(f))).toBe(true);
+  });
+
+  it('does not flag bare scheme in low-risk img-src', () => {
+    const r = checkCSP({ 'content-security-policy': "default-src 'self'; form-action 'self'; img-src https:" });
+    expect(r.findings.some(f => /Wildcard or bare-scheme/i.test(f))).toBe(false);
+  });
+
   it('clean CSP returns score 20', () => {
     const r = checkCSP({ 'content-security-policy': "default-src 'self'; form-action 'self'; base-uri 'self'" });
     expect(r.score).toBe(20);
