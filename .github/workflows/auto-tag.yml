@@ -1,28 +1,28 @@
-name: CI + Auto Tag
+name: Auto Tag
 
 on:
-  push:
+  workflow_run:
+    workflows: ["CI"]
+    types: [completed]
     branches: [main]
 
 jobs:
-  ci-and-tag:
-    name: Test & Tag
+  tag:
+    name: Tag
     runs-on: ubuntu-latest
-    if: "!contains(github.event.head_commit.message, '[skip ci]')"
+    if: github.event.workflow_run.conclusion == 'success'
     permissions:
       contents: write
     steps:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
+          ref: ${{ github.event.workflow_run.head_sha }}
           token: ${{ secrets.GITHUB_TOKEN }}
 
       - uses: actions/setup-node@v4
         with:
           node-version: '20'
-
-      - name: Test
-        run: npm test
 
       - name: Tag HEAD with next patch version
         run: |
