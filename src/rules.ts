@@ -116,12 +116,12 @@ export function checkCSP(headers: RawHeaders): HeaderFinding {
   const wildcardDirectives = ['default-src', 'script-src', 'connect-src', 'form-action', 'frame-src', 'worker-src'];
   const wildcarded = wildcardDirectives.filter(d => {
     const sources = extractCspDirective(raw, d);
-    return sources !== undefined && sources.includes('*');
+    return sources !== undefined && sources.some(isPermissiveSource);
   });
   if (wildcarded.length > 0) {
     score -= 5;
-    findings.push(`Wildcard (*) source in ${wildcarded.join(', ')} allows any origin`);
-    recommendations.push('Replace wildcards with specific trusted domains');
+    findings.push(`Wildcard or bare-scheme source in ${wildcarded.join(', ')} allows any origin`);
+    recommendations.push('Replace wildcards and bare schemes (e.g. https:) with specific trusted domains');
   }
   // form-action does NOT inherit from default-src, so its absence leaves form
   // submissions unrestricted even under a strict default-src 'self'.
