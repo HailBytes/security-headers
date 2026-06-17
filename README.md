@@ -130,6 +130,51 @@ interface HeaderFinding {
 
 ---
 
+## CI Integration
+
+### GitHub Actions
+
+Gate deployments on security header grades by adding this job to your workflow:
+
+```yaml
+name: Security Headers
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  security-headers:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check security headers
+        run: npx @hailbytes/security-headers https://staging.example.com
+```
+
+The CLI exits `1` when the grade is **D or F**, causing the step to fail. Replace the URL with your staging or production endpoint.
+
+To run as a non-blocking audit (always passes, useful for reporting):
+
+```yaml
+      - name: Audit security headers (informational)
+        run: npx @hailbytes/security-headers https://example.com || true
+```
+
+To capture the JSON report as a workflow artifact:
+
+```yaml
+      - name: Export security headers report
+        run: npx @hailbytes/security-headers https://example.com --json > security-headers-report.json || true
+      - uses: actions/upload-artifact@v4
+        with:
+          name: security-headers-report
+          path: security-headers-report.json
+```
+
+---
+
 ## Who Is This For
 
 Security engineers, DevSecOps teams, and ASM platform integrations that need automated header auditing on every deployment, pentesters who run this against every target scope, and developers who want to verify their app's security posture without leaving the terminal.
