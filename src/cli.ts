@@ -28,6 +28,14 @@ function getVersion(): string {
   }
 }
 
+// Grade order from best to worst. Index encodes severity for comparison.
+const GRADE_ORDER: string[] = ['A+', 'A', 'B', 'C', 'D', 'F'];
+
+function gradeIndex(grade: string): number {
+  const idx = GRADE_ORDER.indexOf(grade);
+  return idx === -1 ? GRADE_ORDER.length : idx;
+}
+
 function printHelp() {
   const v = getVersion();
   console.log(`${B}@hailbytes/security-headers${R} v${v}`);
@@ -37,16 +45,18 @@ function printHelp() {
   console.log('  npx @hailbytes/security-headers <url> [options]');
   console.log('');
   console.log(`${B}Options:${R}`);
-  console.log('  --json        Output report as JSON');
-  console.log('  --timeout ms  Fetch timeout in milliseconds (default: 10000)');
-  console.log('  --version     Print version and exit');
-  console.log('  --help        Print this help and exit');
+  console.log('  --json              Output report as JSON');
+  console.log('  --timeout ms        Fetch timeout in milliseconds (default: 10000)');
+  console.log('  --min-grade grade   Exit 1 if grade is below this (default: D)');
+  console.log('                      Accepted values: A+, A, B, C, D, F');
+  console.log('  --version           Print version and exit');
+  console.log('  --help              Print this help and exit');
   console.log('');
   console.log(`${B}Examples:${R}`);
   console.log('  security-headers https://example.com');
   console.log('  security-headers https://example.com --json');
   console.log('  security-headers https://example.com --timeout 5000');
-  console.log('  security-headers https://staging.example.com || echo "Gate failed"');
+  console.log('  security-headers https://staging.example.com --min-grade B || echo "Gate failed"');
 }
 
 function printReport(r: SecurityHeaderReport) {
@@ -82,9 +92,16 @@ async function main() {
   const jsonMode = args.includes('--json');
   const timeoutArg = args.find((a, i) => a === '--timeout' && args[i + 1]);
   const timeoutMs = timeoutArg ? parseInt(args[args.indexOf('--timeout') + 1], 10) : undefined;
-  const url = args.find(a => !a.startsWith('--') && a !== String(timeoutMs));
+  const minGradeIdx = args.indexOf('--min-grade');
+  const minGradeRaw = minGradeIdx !== -1 ? args[minGradeIdx + 1] : undefined;
+  if (minGradeRaw !== undefined && !GRADE_ORDER.includes(minGradeRaw)) {
+    console.error(`Invalid --min-grade value '${minGradeRaw}'. Accepted: ${GRADE_ORDER.join(', ')}`);
+    process.exit(1);
+  }
+  const minGrade = minGradeRaw ?? 'D';
+  const url = args.find(a => !a.startsWith('--') && a !== String(timeoutMs) && a !== minGradeRaw);
   if (!url) {
-    console.error('Usage: security-headers <url> [--json] [--timeout ms] [--help] [--version]');
+    console.error('Usage: security-headers <url> [--json] [--timeout ms] [--min-grade grade] [--help] [--version]');
     console.error('Run with --help for full usage information.');
     process.exit(1);
   }
@@ -92,7 +109,7 @@ async function main() {
     const report = await analyze(url, timeoutMs !== undefined ? { timeoutMs } : undefined);
     if (jsonMode) { console.log(JSON.stringify(report, null, 2)); }
     else { printReport(report); }
-    if (report.grade === 'D' || report.grade === 'F') process.exit(1);
+    if (gradeIndex(report.grade) > gradeIndex(minGrade)) process.exit(1);
   } catch (err) {
     console.error(`Error: ${(err as Error).message}`);
     process.exit(1);
