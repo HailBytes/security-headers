@@ -201,11 +201,18 @@ export function checkReferrerPolicy(headers: RawHeaders): HeaderFinding {
   // no-referrer-when-downgrade is intentionally excluded: it sends the full URL
   // (path + query) to every cross-origin HTTPS destination. It was the historical
   // browser default precisely because it was the least restrictive option.
-  const strongValues = ['no-referrer', 'strict-origin', 'strict-origin-when-cross-origin', 'same-origin'];
-  const isStrong = strongValues.includes(raw.toLowerCase().trim());
-  const score = isStrong ? 10 : 5;
-  return { header: 'Referrer-Policy', score, maxScore: 10, status: isStrong ? 'good' : 'warning', raw,
-    findings: isStrong ? [] : [`Value '${raw}' may leak referrer information`],
+  const strongValues = new Set(['no-referrer', 'strict-origin', 'strict-origin-when-cross-origin', 'same-origin']);
+  // Referrer-Policy supports a comma-separated fallback list; browsers use the last recognised value.
+  // e.g. "unsafe-url, strict-origin-when-cross-origin" is effectively strict-origin-when-cross-origin.
+  const allValidPolicies = new Set([
+    'no-referrer', 'no-referrer-when-downgrade', 'origin', 'origin-when-cross-origin',
+    'same-origin', 'strict-origin', 'strict-origin-when-cross-origin', 'unsafe-url', '',
+  ]);
+  const tokens = raw.split(',').map(t => t.trim().toLowerCase());
+  const effective = tokens.filter(t => allValidPolicies.has(t)).pop() ?? tokens[tokens.length - 1] ?? raw.toLowerCase().trim();
+  const isStrong = strongValues.has(effective);
+  return { header: 'Referrer-Policy', score: isStrong ? 10 : 5, maxScore: 10, status: isStrong ? 'good' : 'warning', raw,
+    findings: isStrong ? [] : [`Value '${effective}' may leak referrer information`],
     recommendations: isStrong ? [] : ['Use: strict-origin-when-cross-origin'] };
 }
 

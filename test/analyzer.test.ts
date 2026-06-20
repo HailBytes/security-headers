@@ -390,6 +390,24 @@ describe('checkReferrerPolicy', () => {
     expect(r.score).toBe(5);
     expect(r.status).toBe('warning');
   });
+
+  it('comma-separated fallback list: last recognized strong value earns full score', () => {
+    const r = checkReferrerPolicy({ 'referrer-policy': 'unsafe-url, strict-origin-when-cross-origin' });
+    expect(r.score).toBe(10);
+    expect(r.status).toBe('good');
+  });
+
+  it('comma-separated fallback list: last recognized weak value gives warning', () => {
+    const r = checkReferrerPolicy({ 'referrer-policy': 'strict-origin-when-cross-origin, unsafe-url' });
+    expect(r.score).toBe(5);
+    expect(r.status).toBe('warning');
+  });
+
+  it('finding reports the effective value, not the full fallback list string', () => {
+    const r = checkReferrerPolicy({ 'referrer-policy': 'strict-origin-when-cross-origin, unsafe-url' });
+    expect(r.findings[0]).toContain('unsafe-url');
+    expect(r.findings[0]).not.toContain('strict-origin-when-cross-origin');
+  });
 });
 
 describe('checkPermissionsPolicy', () => {
