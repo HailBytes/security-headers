@@ -81,7 +81,12 @@ async function main() {
 
   const jsonMode = args.includes('--json');
   const timeoutArg = args.find((a, i) => a === '--timeout' && args[i + 1]);
-  const timeoutMs = timeoutArg ? parseInt(args[args.indexOf('--timeout') + 1], 10) : undefined;
+  const timeoutRaw = timeoutArg ? parseInt(args[args.indexOf('--timeout') + 1], 10) : undefined;
+  if (timeoutRaw !== undefined && (isNaN(timeoutRaw) || timeoutRaw <= 0)) {
+    console.error('Error: --timeout must be a positive integer (milliseconds), e.g. --timeout 5000');
+    process.exit(1);
+  }
+  const timeoutMs = timeoutRaw;
   const url = args.find(a => !a.startsWith('--') && a !== String(timeoutMs));
   if (!url) {
     console.error('Usage: security-headers <url> [--json] [--timeout ms] [--help] [--version]');

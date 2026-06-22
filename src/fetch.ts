@@ -3,7 +3,9 @@ export interface FetchOptions {
 }
 
 export async function fetchHeaders(url: string, options?: FetchOptions): Promise<Record<string, string>> {
-  const timeoutMs = options?.timeoutMs ?? 10000;
+  const timeoutMs = (options?.timeoutMs != null && Number.isFinite(options.timeoutMs) && options.timeoutMs > 0)
+    ? options.timeoutMs
+    : 10000;
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), timeoutMs);
   try {
