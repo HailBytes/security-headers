@@ -63,9 +63,19 @@ export function checkHSTS(headers: RawHeaders): HeaderFinding {
   // includeSubDomains / preload only add protection when HSTS is actually
   // enforced; awarding their bonuses under max-age=0 would mask a revocation.
   if (maxAge > 0) {
-    if (/includesubdomains/i.test(raw)) { score += 3; }
+    const hasIncludeSubDomains = /includesubdomains/i.test(raw);
+    if (hasIncludeSubDomains) { score += 3; }
     else { findings.push('includeSubDomains not set'); recommendations.push('Add includeSubDomains directive'); }
-    if (/preload/i.test(raw)) score += 2;
+    if (/preload/i.test(raw)) {
+      if (hasIncludeSubDomains) {
+        score += 2;
+      } else {
+        // preload without includeSubDomains is rejected by the HSTS preload list
+        // (hstspreload.org requires both). The directive is inert in this config.
+        findings.push('preload requires includeSubDomains — this config is not eligible for the HSTS preload list');
+        recommendations.push('Add includeSubDomains alongside preload to qualify for the HSTS preload list');
+      }
+    }
   }
 
   return { header: 'Strict-Transport-Security', score, maxScore: 20, status: score >= 15 ? 'good' : 'warning', raw, findings, recommendations };

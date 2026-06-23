@@ -96,10 +96,17 @@ describe('checkHSTS', () => {
     expect(r.score).toBe(15);
   });
 
-  it('preload adds 2 bonus points', () => {
+  it('preload adds 2 bonus points when includeSubDomains is also set', () => {
     const withPreload = checkHSTS({ 'strict-transport-security': 'max-age=31536000; includeSubDomains; preload' });
     const withoutPreload = checkHSTS({ 'strict-transport-security': 'max-age=31536000; includeSubDomains' });
     expect(withPreload.score).toBe(withoutPreload.score + 2);
+  });
+
+  it('preload without includeSubDomains earns no bonus and flags a finding', () => {
+    const r = checkHSTS({ 'strict-transport-security': 'max-age=31536000; preload' });
+    // 10 (base) + 5 (max-age ≥ 1yr) + 0 (no includeSubDomains) + 0 (preload inert) = 15
+    expect(r.score).toBe(15);
+    expect(r.findings.some(f => /preload.*includeSubDomains/i.test(f))).toBe(true);
   });
 
   it('case-insensitive header name matching', () => {
