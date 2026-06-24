@@ -80,12 +80,27 @@ async function main() {
   }
 
   const jsonMode = args.includes('--json');
-  const timeoutArg = args.find((a, i) => a === '--timeout' && args[i + 1]);
-  const timeoutMs = timeoutArg ? parseInt(args[args.indexOf('--timeout') + 1], 10) : undefined;
-  const url = args.find(a => !a.startsWith('--') && a !== String(timeoutMs));
+  const timeoutArgIdx = args.indexOf('--timeout');
+  const timeoutRaw = timeoutArgIdx !== -1 ? args[timeoutArgIdx + 1] : undefined;
+  let timeoutMs: number | undefined;
+  if (timeoutRaw !== undefined) {
+    const parsed = parseInt(timeoutRaw, 10);
+    if (!Number.isFinite(parsed) || parsed <= 0) {
+      console.error(`Error: --timeout must be a positive integer (got "${timeoutRaw}")`);
+      process.exit(1);
+    }
+    timeoutMs = parsed;
+  }
+  const url = args.find(a => !a.startsWith('--') && a !== timeoutRaw);
   if (!url) {
     console.error('Usage: security-headers <url> [--json] [--timeout ms] [--help] [--version]');
     console.error('Run with --help for full usage information.');
+    process.exit(1);
+  }
+  try {
+    new URL(url);
+  } catch {
+    console.error(`Error: Invalid URL "${url}". URLs must include a scheme, e.g. https://example.com`);
     process.exit(1);
   }
   try {
