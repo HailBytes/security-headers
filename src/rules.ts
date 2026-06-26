@@ -113,7 +113,7 @@ export function checkCSP(headers: RawHeaders): HeaderFinding {
   // fetch/navigation directive — not just as the first token of default-src/
   // script-src. img-src/style-src/font-src/media-src are intentionally omitted
   // as a wildcard there is low-risk and commonly legitimate.
-  const wildcardDirectives = ['default-src', 'script-src', 'connect-src', 'form-action', 'frame-src', 'worker-src'];
+  const wildcardDirectives = ['default-src', 'script-src', 'connect-src', 'form-action', 'frame-src', 'worker-src', 'object-src'];
   const wildcarded = wildcardDirectives.filter(d => {
     const sources = extractCspDirective(raw, d);
     return sources !== undefined && sources.some(isPermissiveSource);
