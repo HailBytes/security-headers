@@ -65,7 +65,16 @@ export function checkHSTS(headers: RawHeaders): HeaderFinding {
   if (maxAge > 0) {
     if (/includesubdomains/i.test(raw)) { score += 3; }
     else { findings.push('includeSubDomains not set'); recommendations.push('Add includeSubDomains directive'); }
-    if (/preload/i.test(raw)) score += 2;
+    if (/preload/i.test(raw)) {
+      // hstspreload.org requires max-age >= 63072000 (2 years). Award the bonus
+      // only when the site meets that threshold; otherwise surface a finding.
+      if (maxAge >= 63072000) {
+        score += 2;
+      } else {
+        findings.push(`preload is set but max-age=${maxAge} is below the 63072000 (2 year) minimum required by hstspreload.org`);
+        recommendations.push('Set max-age=63072000 to meet the HSTS preload minimum');
+      }
+    }
   }
 
   return { header: 'Strict-Transport-Security', score, maxScore: 20, status: score >= 15 ? 'good' : 'warning', raw, findings, recommendations };

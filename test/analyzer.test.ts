@@ -80,7 +80,7 @@ describe('checkHSTS', () => {
   });
 
   it('full HSTS returns score 20', () => {
-    const r = checkHSTS({ 'strict-transport-security': 'max-age=31536000; includeSubDomains; preload' });
+    const r = checkHSTS({ 'strict-transport-security': 'max-age=63072000; includeSubDomains; preload' });
     expect(r.score).toBe(20);
     expect(r.status).toBe('good');
   });
@@ -96,14 +96,20 @@ describe('checkHSTS', () => {
     expect(r.score).toBe(15);
   });
 
-  it('preload adds 2 bonus points', () => {
-    const withPreload = checkHSTS({ 'strict-transport-security': 'max-age=31536000; includeSubDomains; preload' });
-    const withoutPreload = checkHSTS({ 'strict-transport-security': 'max-age=31536000; includeSubDomains' });
+  it('preload adds 2 bonus points when max-age meets the 2-year requirement', () => {
+    const withPreload = checkHSTS({ 'strict-transport-security': 'max-age=63072000; includeSubDomains; preload' });
+    const withoutPreload = checkHSTS({ 'strict-transport-security': 'max-age=63072000; includeSubDomains' });
     expect(withPreload.score).toBe(withoutPreload.score + 2);
   });
 
+  it('preload with max-age < 2 years triggers a finding instead of a bonus', () => {
+    const r = checkHSTS({ 'strict-transport-security': 'max-age=31536000; includeSubDomains; preload' });
+    expect(r.findings.some(f => /preload/i.test(f))).toBe(true);
+    expect(r.score).toBe(18); // 10 base + 5 (1yr) + 3 (includeSubDomains), no preload bonus
+  });
+
   it('case-insensitive header name matching', () => {
-    const r = checkHSTS({ 'Strict-Transport-Security': 'max-age=31536000; includeSubDomains; preload' });
+    const r = checkHSTS({ 'Strict-Transport-Security': 'max-age=63072000; includeSubDomains; preload' });
     expect(r.score).toBe(20);
   });
 
@@ -514,7 +520,7 @@ describe('checkCrossOriginPolicies', () => {
 describe('grade boundaries', () => {
   it('A+ at 90%', () => {
     const headers = {
-      'strict-transport-security': 'max-age=31536000; includeSubDomains; preload',
+      'strict-transport-security': 'max-age=63072000; includeSubDomains; preload',
       'content-security-policy': "default-src 'self'; form-action 'self'; base-uri 'self'",
       'x-frame-options': 'DENY',
       'x-content-type-options': 'nosniff',
