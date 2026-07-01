@@ -121,11 +121,11 @@ interface HeaderFinding {
 | Header | Max Points | Key Checks |
 |---|---|---|
 | Strict-Transport-Security | 20 | max-age ≥ 1 year, includeSubDomains, preload |
-| Content-Security-Policy | 30 | presence, no unsafe-inline/eval, no wildcards, form-action set |
+| Content-Security-Policy | 30 | presence, no unsafe-inline/eval, no wildcard/bare-scheme sources, form-action set, base-uri set |
 | X-Frame-Options | 15 | DENY or SAMEORIGIN (or CSP frame-ancestors) |
 | X-Content-Type-Options | 10 | nosniff |
 | Referrer-Policy | 10 | strict values only |
-| Permissions-Policy | 10 | presence |
+| Permissions-Policy | 10 | camera, microphone, and geolocation restricted |
 | Cross-Origin Policies | 5 | COEP, COOP, CORP |
 
 ---
