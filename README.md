@@ -39,6 +39,9 @@ npx @hailbytes/security-headers https://example.com --json
 
 # Use as a CI gate (exits 1 on grade D or F)
 npx @hailbytes/security-headers https://staging.example.com || echo "Security headers gate failed"
+
+# Scan a local/internal target (disables SSRF protection — see below)
+npx @hailbytes/security-headers http://localhost:3000 --allow-private
 ```
 
 ### Library — analyze a URL
@@ -73,6 +76,22 @@ for (const h of report.headers) {
     console.log(h.header, h.recommendations);
   }
 }
+```
+
+---
+
+## SSRF Protection
+
+`analyze()`/`fetchHeaders()` reject non-`http(s)` schemes and, by default, refuse to fetch loopback, link-local, and private-use addresses (RFC1918/RFC4193, cloud metadata endpoints like `169.254.169.254`, etc.) — including when a redirect chain leads there. This matters if you embed this library in a service that scans user- or customer-supplied URLs.
+
+To scan local/staging targets, opt in explicitly:
+
+```ts
+await analyze('http://localhost:3000', { allowPrivateNetworks: true });
+```
+
+```bash
+npx @hailbytes/security-headers http://localhost:3000 --allow-private
 ```
 
 ---
