@@ -138,6 +138,16 @@ export function checkCSP(headers: RawHeaders): HeaderFinding {
     findings.push("No base-uri directive — <base> injection can redirect relative nonce sources (base-uri does not inherit from default-src)");
     recommendations.push("Add base-uri 'self' or base-uri 'none' to prevent <base> injection");
   }
+  // object-src DOES inherit from default-src, but only when default-src is
+  // actually set. If neither is present, <object>/<embed> plugin content is
+  // completely unrestricted — a legacy but still-audited XSS vector — and every
+  // other fetch directive not explicitly listed (img-src, media-src, connect-src,
+  // etc.) also silently defaults to allow-all with no default-src to fall back to.
+  if (extractCspDirective(raw, 'default-src') === undefined && extractCspDirective(raw, 'object-src') === undefined) {
+    score -= 2;
+    findings.push('No default-src or object-src directive — plugin content (<object>/<embed>) is unrestricted, and any other fetch directive not explicitly listed defaults to allow-all');
+    recommendations.push("Add object-src 'none' (or set default-src as a fallback that covers it)");
+  }
   score = Math.max(5, score); // at least 5 for having any CSP
 
   return { header: 'Content-Security-Policy', score, maxScore: 30, status: findings.length === 0 ? 'good' : 'warning', raw, findings, recommendations };
