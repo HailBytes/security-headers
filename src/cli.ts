@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 import { createRequire } from 'node:module';
 import { analyze } from './index.js';
+import { parseArgs } from './cli-args.js';
 import type { SecurityHeaderReport } from './types.js';
 
 const require = createRequire(import.meta.url);
@@ -68,29 +69,32 @@ function printReport(r: SecurityHeaderReport) {
 
 async function main() {
   const args = process.argv.slice(2);
+  const parsed = parseArgs(args);
 
-  if (args.includes('--help') || args.includes('-h')) {
+  if (parsed.help) {
     printHelp();
     process.exit(0);
   }
 
-  if (args.includes('--version') || args.includes('-v')) {
+  if (parsed.version) {
     console.log(getVersion());
     process.exit(0);
   }
 
-  const jsonMode = args.includes('--json');
-  const timeoutArg = args.find((a, i) => a === '--timeout' && args[i + 1]);
-  const timeoutMs = timeoutArg ? parseInt(args[args.indexOf('--timeout') + 1], 10) : undefined;
-  const url = args.find(a => !a.startsWith('--') && a !== String(timeoutMs));
-  if (!url) {
+  if (parsed.error) {
+    console.error(`Error: ${parsed.error}`);
+    console.error('Run with --help for full usage information.');
+    process.exit(1);
+  }
+
+  if (!parsed.url) {
     console.error('Usage: security-headers <url> [--json] [--timeout ms] [--help] [--version]');
     console.error('Run with --help for full usage information.');
     process.exit(1);
   }
   try {
-    const report = await analyze(url, timeoutMs !== undefined ? { timeoutMs } : undefined);
-    if (jsonMode) { console.log(JSON.stringify(report, null, 2)); }
+    const report = await analyze(parsed.url, parsed.timeoutMs !== undefined ? { timeoutMs: parsed.timeoutMs } : undefined);
+    if (parsed.json) { console.log(JSON.stringify(report, null, 2)); }
     else { printReport(report); }
     if (report.grade === 'D' || report.grade === 'F') process.exit(1);
   } catch (err) {
