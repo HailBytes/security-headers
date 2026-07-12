@@ -1,5 +1,29 @@
 # Changelog
 
+## [1.0.3] - 2026-06-11
+
+### Fixed
+- CSP: bare-scheme sources (e.g. `https:`) in `script-src`, `connect-src`, `form-action`, `frame-src`, `worker-src`, and `default-src` are now flagged as permissive, since they match any host just like a wildcard (#68)
+
+## [1.0.2] - 2026-05-26
+
+### Added
+- Dependabot configuration for automated dependency updates
+- Full README with badges, quick start, grading scale, and headers-checked table
+- npm publish and auto-tag CI workflows, gated on full CI success (#69)
+- CLI `--help` and `--version` flags, plus a configurable fetch timeout
+
+### Changed
+- **Grading is stricter and can lower previously-A/A+ scores:**
+  - Permissions-Policy now requires `camera=()`, `microphone=()`, and `geolocation=()` to score full marks — any other value previously scored "good" regardless of what it restricted (#4)
+  - CSP and Cross-Origin-* header checks tightened (#50)
+  - CSP now flags a missing `base-uri` directive (#51)
+
+### Fixed
+- CLI `--version` now loads the package version correctly under ESM (#47)
+- Test files are excluded from the build `tsconfig` so they no longer get compiled into `dist` (#48)
+- High-severity `vite` vulnerability patched; `npm audit --audit-level=high` is now enforced in CI (#71)
+
 ## [1.0.1] - 2025-05-19
 
 ### Added

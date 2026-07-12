@@ -24,7 +24,7 @@ jobs:
         with:
           node-version: '20'
 
-      - name: Tag HEAD with next patch version
+      - name: Bump package.json, tag, and push
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
@@ -38,6 +38,15 @@ jobs:
           IFS='.' read -r MAJOR MINOR PATCH <<< "$CURRENT"
           NEW_VERSION="$MAJOR.$MINOR.$((PATCH + 1))"
 
+          # Keep package.json/package-lock.json in sync with the tag being cut —
+          # previously only the ephemeral publish job saw the bumped version, so
+          # main permanently drifted behind what was actually tagged and published.
+          npm version "$NEW_VERSION" --no-git-tag-version --allow-same-version
+          git commit -am "chore: release v$NEW_VERSION [skip ci]"
           git tag "v$NEW_VERSION"
+
+          # [skip ci] keeps this push from re-triggering CI (and therefore this
+          # workflow) on the release commit itself.
+          git push origin HEAD:main
           git push origin "v$NEW_VERSION"
-          echo "Tagged HEAD as v$NEW_VERSION"
+          echo "Released v$NEW_VERSION"
