@@ -172,10 +172,22 @@ export function checkXFrameOptions(headers: RawHeaders): HeaderFinding {
     };
   }
   const val = (raw ?? '').toUpperCase().trim();
-  const score = (val === 'DENY' || val === 'SAMEORIGIN') ? 15 : 8;
-  return { header: 'X-Frame-Options', score, maxScore: 15, status: score === 15 ? 'good' : 'warning', raw,
-    findings: score < 15 ? [`X-Frame-Options value '${raw}' is not DENY or SAMEORIGIN`] : [],
-    recommendations: score < 15 ? ['Use DENY or SAMEORIGIN'] : [] };
+  if (val === 'DENY' || val === 'SAMEORIGIN') {
+    return { header: 'X-Frame-Options', score: 15, maxScore: 15, status: 'good', raw, findings: [], recommendations: [] };
+  }
+  // ALLOW-FROM was dropped by every current browser engine (Chrome, Firefox,
+  // Safari, Edge) years ago — it is silently ignored, not honored, so it
+  // provides zero real clickjacking protection despite looking like a valid directive.
+  if (val.startsWith('ALLOW-FROM')) {
+    return {
+      header: 'X-Frame-Options', score: 0, maxScore: 15, status: 'warning', raw,
+      findings: ['ALLOW-FROM is non-standard and ignored by all current browsers — provides no clickjacking protection'],
+      recommendations: ["Use DENY or SAMEORIGIN, or CSP frame-ancestors to allowlist specific origins"],
+    };
+  }
+  return { header: 'X-Frame-Options', score: 8, maxScore: 15, status: 'warning', raw,
+    findings: [`X-Frame-Options value '${raw}' is not DENY or SAMEORIGIN`],
+    recommendations: ['Use DENY or SAMEORIGIN'] };
 }
 
 export function checkXContentTypeOptions(headers: RawHeaders): HeaderFinding {
