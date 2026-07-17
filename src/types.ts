@@ -14,6 +14,8 @@ export type Grade = 'A+' | 'A' | 'B' | 'C' | 'D' | 'F';
 
 export interface SecurityHeaderReport {
   url?: string;
+  /** The URL the response actually came from, if it differs from `url` after redirects. */
+  finalUrl?: string;
   grade: Grade;
   score: number;
   maxScore: number;

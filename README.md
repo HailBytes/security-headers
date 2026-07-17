@@ -82,6 +82,7 @@ for (const h of report.headers) {
 ```ts
 interface SecurityHeaderReport {
   url?: string;
+  finalUrl?: string;        // set when the response was reached via a redirect
   grade: 'A+' | 'A' | 'B' | 'C' | 'D' | 'F';
   score: number;
   maxScore: number;

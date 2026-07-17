@@ -1,4 +1,4 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi, afterEach } from 'vitest';
 import { analyzeHeaders } from '../src/analyzer.js';
 import { analyze } from '../src/index.js';
 import {
@@ -70,6 +70,35 @@ describe('analyze convenience function', () => {
   it('analyze with empty object returns grade F', async () => {
     const r = await analyze({});
     expect(r.grade).toBe('F');
+  });
+
+  describe('with a fetched URL', () => {
+    afterEach(() => {
+      vi.unstubAllGlobals();
+    });
+
+    it('sets finalUrl when the response was redirected', async () => {
+      vi.stubGlobal('fetch', vi.fn().mockResolvedValue({
+        url: 'https://www.example.com/',
+        headers: new Headers({ 'x-content-type-options': 'nosniff' }),
+        body: { cancel: vi.fn().mockResolvedValue(undefined) },
+      }));
+
+      const r = await analyze('https://example.com/');
+      expect(r.url).toBe('https://example.com/');
+      expect(r.finalUrl).toBe('https://www.example.com/');
+    });
+
+    it('leaves finalUrl unset when there is no redirect', async () => {
+      vi.stubGlobal('fetch', vi.fn().mockResolvedValue({
+        url: 'https://example.com/',
+        headers: new Headers({ 'x-content-type-options': 'nosniff' }),
+        body: { cancel: vi.fn().mockResolvedValue(undefined) },
+      }));
+
+      const r = await analyze('https://example.com/');
+      expect(r.finalUrl).toBeUndefined();
+    });
   });
 });
 
