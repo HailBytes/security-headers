@@ -49,6 +49,12 @@ jobs:
             echo "::warning::No matching v* tag found at this commit; publishing package.json version as-is"
           fi
 
+      - name: Type-check
+        run: npm run typecheck
+
+      - name: Test
+        run: npm test
+
       - name: Build
         run: npm run build
 
