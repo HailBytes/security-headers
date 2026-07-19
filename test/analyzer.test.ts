@@ -172,13 +172,13 @@ describe('checkCSP', () => {
   });
 
   it("does not penalize 'unsafe-inline' when nonce present without 'strict-dynamic' (CSP2 makes it a no-op)", () => {
-    const r = checkCSP({ 'content-security-policy': "script-src 'nonce-abc123' 'unsafe-inline'; form-action 'self'; base-uri 'none'" });
+    const r = checkCSP({ 'content-security-policy': "default-src 'self'; script-src 'nonce-abc123' 'unsafe-inline'; form-action 'self'; base-uri 'none'" });
     expect(r.findings.some(f => f.includes('unsafe-inline'))).toBe(false);
     expect(r.score).toBe(20);
   });
 
   it("does not penalize 'unsafe-inline' when hash present without 'strict-dynamic' (CSP2 makes it a no-op)", () => {
-    const r = checkCSP({ 'content-security-policy': "script-src 'sha256-abc123def456abc123def456abc123def456abc1' 'unsafe-inline'; form-action 'self'; base-uri 'none'" });
+    const r = checkCSP({ 'content-security-policy': "default-src 'self'; script-src 'sha256-abc123def456abc123def456abc123def456abc1' 'unsafe-inline'; form-action 'self'; base-uri 'none'" });
     expect(r.findings.some(f => f.includes('unsafe-inline'))).toBe(false);
     expect(r.score).toBe(20);
   });
