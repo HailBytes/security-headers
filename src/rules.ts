@@ -112,7 +112,7 @@ export function checkCSP(headers: RawHeaders): HeaderFinding {
   // fetch/navigation directive — not just as the first token of default-src/
   // script-src. img-src/style-src/font-src/media-src are intentionally omitted
   // as a wildcard there is low-risk and commonly legitimate.
-  const wildcardDirectives = ['default-src', 'script-src', 'connect-src', 'form-action', 'frame-src', 'worker-src'];
+  const wildcardDirectives = ['default-src', 'script-src', 'connect-src', 'form-action', 'frame-src', 'worker-src', 'object-src'];
   const wildcarded = wildcardDirectives.filter(d => {
     const sources = extractCspDirective(raw, d);
     return sources !== undefined && sources.some(isPermissiveSource);
@@ -136,6 +136,16 @@ export function checkCSP(headers: RawHeaders): HeaderFinding {
     score -= 2;
     findings.push("No base-uri directive — <base> injection can redirect relative nonce sources (base-uri does not inherit from default-src)");
     recommendations.push("Add base-uri 'self' or base-uri 'none' to prevent <base> injection");
+  }
+  // object-src DOES inherit from default-src, but only when default-src is
+  // actually set. If neither is present, <object>/<embed> plugin content is
+  // completely unrestricted — a legacy but still-audited XSS vector — and every
+  // other fetch directive not explicitly listed (img-src, media-src, connect-src,
+  // etc.) also silently defaults to allow-all with no default-src to fall back to.
+  if (extractCspDirective(raw, 'default-src') === undefined && extractCspDirective(raw, 'object-src') === undefined) {
+    score -= 2;
+    findings.push('No default-src or object-src directive — plugin content (<object>/<embed>) is unrestricted, and any other fetch directive not explicitly listed defaults to allow-all');
+    recommendations.push("Add object-src 'none' (or set default-src as a fallback that covers it)");
   }
   score = Math.max(5, score); // at least 5 for having any CSP
 
@@ -201,7 +211,15 @@ export function checkReferrerPolicy(headers: RawHeaders): HeaderFinding {
   // (path + query) to every cross-origin HTTPS destination. It was the historical
   // browser default precisely because it was the least restrictive option.
   const strongValues = ['no-referrer', 'strict-origin', 'strict-origin-when-cross-origin', 'same-origin'];
-  const isStrong = strongValues.includes(raw.toLowerCase().trim());
+  // Per W3C Referrer Policy spec the header value may be a comma-separated list;
+  // browsers parse left-to-right and use the last token they recognise. Unrecognised
+  // tokens are skipped, so `unsafe-url, strict-origin-when-cross-origin` is effectively
+  // strong. We must apply the same last-recognised-wins logic here.
+  const allValidPolicies = ['no-referrer', 'no-referrer-when-downgrade', 'same-origin', 'origin',
+    'strict-origin', 'origin-when-cross-origin', 'strict-origin-when-cross-origin', 'unsafe-url'];
+  const tokens = raw.toLowerCase().split(',').map(t => t.trim()).filter(Boolean);
+  const effective = [...tokens].reverse().find(t => allValidPolicies.includes(t)) ?? tokens[tokens.length - 1] ?? '';
+  const isStrong = strongValues.includes(effective);
   const score = isStrong ? 10 : 5;
   return { header: 'Referrer-Policy', score, maxScore: 10, status: isStrong ? 'good' : 'warning', raw,
     findings: isStrong ? [] : [`Value '${raw}' may leak referrer information`],
