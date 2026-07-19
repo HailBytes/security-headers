@@ -133,7 +133,7 @@ interface HeaderFinding {
 | X-Frame-Options | 15 | DENY or SAMEORIGIN (or CSP frame-ancestors) |
 | X-Content-Type-Options | 10 | nosniff |
 | Referrer-Policy | 10 | strict values only |
-| Permissions-Policy | 10 | presence |
+| Permissions-Policy | 10 | camera, microphone, and geolocation restricted |
 | Cross-Origin Policies | 5 | COEP, COOP, CORP |
 
 ---
@@ -143,6 +143,51 @@ interface HeaderFinding {
 `analyze(url)` / `fetchHeaders(url)` refuse non-`http(s)` schemes and, by default, refuse to fetch hostnames that resolve to loopback, link-local (including the `169.254.169.254` cloud metadata endpoint), or private (RFC1918) addresses — including via a redirect chain, which is validated hop-by-hop rather than trusting only the initial URL. This matters when the URL being scanned comes from an untrusted source (e.g. a customer-supplied target in an ASM pipeline), where an unguarded fetch is an SSRF vector.
 
 For legitimate local/staging use, pass `{ allowPrivateNetworks: true }` (library) or `--allow-private` (CLI) to opt out.
+
+---
+
+## CI Integration
+
+### GitHub Actions
+
+Gate deployments on security header grades by adding this job to your workflow:
+
+```yaml
+name: Security Headers
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  security-headers:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check security headers
+        run: npx @hailbytes/security-headers https://staging.example.com
+```
+
+The CLI exits `1` when the grade is **D or F** by default (use `--fail-on` to set a stricter threshold), causing the step to fail. Replace the URL with your staging or production endpoint.
+
+To run as a non-blocking audit (always passes, useful for reporting):
+
+```yaml
+      - name: Audit security headers (informational)
+        run: npx @hailbytes/security-headers https://example.com || true
+```
+
+To capture the JSON report as a workflow artifact:
+
+```yaml
+      - name: Export security headers report
+        run: npx @hailbytes/security-headers https://example.com --json > security-headers-report.json || true
+      - uses: actions/upload-artifact@v4
+        with:
+          name: security-headers-report
+          path: security-headers-report.json
+```
 
 ---
 
