@@ -63,9 +63,24 @@ export function checkHSTS(headers: RawHeaders): HeaderFinding {
   // includeSubDomains / preload only add protection when HSTS is actually
   // enforced; awarding their bonuses under max-age=0 would mask a revocation.
   if (maxAge > 0) {
-    if (/includesubdomains/i.test(raw)) { score += 3; }
+    const hasIncludeSubDomains = /includesubdomains/i.test(raw);
+    if (hasIncludeSubDomains) { score += 3; }
     else { findings.push('includeSubDomains not set'); recommendations.push('Add includeSubDomains directive'); }
-    if (/preload/i.test(raw)) score += 2;
+    // hstspreload.org requires both includeSubDomains and max-age >= 63072000
+    // (2 years) to accept a submission — award the bonus only when the config
+    // actually qualifies; otherwise the preload token is inert.
+    if (/preload/i.test(raw)) {
+      const HSTS_PRELOAD_MIN_MAX_AGE = 63072000;
+      if (hasIncludeSubDomains && maxAge >= HSTS_PRELOAD_MIN_MAX_AGE) {
+        score += 2;
+      } else if (!hasIncludeSubDomains) {
+        findings.push('preload requires includeSubDomains — this config is not eligible for the HSTS preload list');
+        recommendations.push('Add includeSubDomains alongside preload to qualify for the HSTS preload list');
+      } else {
+        findings.push(`preload is set but max-age=${maxAge} is below the ${HSTS_PRELOAD_MIN_MAX_AGE} (2 year) minimum required by hstspreload.org`);
+        recommendations.push(`Set max-age=${HSTS_PRELOAD_MIN_MAX_AGE} to meet the HSTS preload minimum`);
+      }
+    }
   }
 
   return { header: 'Strict-Transport-Security', score, maxScore: 20, status: score >= 15 ? 'good' : 'warning', raw, findings, recommendations };
