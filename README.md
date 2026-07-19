@@ -40,9 +40,14 @@ npx @hailbytes/security-headers https://example.com --json
 # Use as a CI gate (exits 1 on grade D or F)
 npx @hailbytes/security-headers https://staging.example.com || echo "Security headers gate failed"
 
+# Use a stricter CI gate threshold (exits 1 on grade C or below)
+npx @hailbytes/security-headers https://staging.example.com --fail-on C
+
 # Scan an internal/local target (disabled by default, see Security below)
 npx @hailbytes/security-headers http://localhost:3000 --allow-private
 ```
+
+`--fail-on <grade>` sets the CI-gate threshold — the CLI exits 1 when the report's grade is at or below the given grade (best→worst: `A+`, `A`, `B`, `C`, `D`, `F`). Defaults to `D`, matching the exit-1-on-D-or-F behavior above.
 
 ### Library — analyze a URL
 

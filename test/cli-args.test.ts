@@ -54,4 +54,33 @@ describe('parseArgs', () => {
     expect(parseArgs(['--version']).version).toBe(true);
     expect(parseArgs(['-v']).version).toBe(true);
   });
+
+  it('leaves failOnGrade undefined when --fail-on is omitted (preserves current D/F-only default)', () => {
+    const r = parseArgs(['https://example.com']);
+    expect(r.failOnGrade).toBeUndefined();
+  });
+
+  it('parses a valid --fail-on grade case-insensitively', () => {
+    expect(parseArgs(['https://example.com', '--fail-on', 'C']).failOnGrade).toBe('C');
+    expect(parseArgs(['https://example.com', '--fail-on', 'c']).failOnGrade).toBe('C');
+    expect(parseArgs(['https://example.com', '--fail-on', 'A+']).failOnGrade).toBe('A+');
+  });
+
+  it('rejects an invalid --fail-on grade', () => {
+    const r = parseArgs(['https://example.com', '--fail-on', 'Z']);
+    expect(r.error).toMatch(/--fail-on must be one of/);
+    expect(r.failOnGrade).toBeUndefined();
+  });
+
+  it('rejects --fail-on with no value', () => {
+    const r = parseArgs(['https://example.com', '--fail-on']);
+    expect(r.error).toMatch(/--fail-on must be one of/);
+  });
+
+  it('excludes both --timeout and --fail-on values from URL detection', () => {
+    const r = parseArgs(['--timeout', '3000', '--fail-on', 'C', 'https://example.com']);
+    expect(r.url).toBe('https://example.com');
+    expect(r.timeoutMs).toBe(3000);
+    expect(r.failOnGrade).toBe('C');
+  });
 });

@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 import { createRequire } from 'node:module';
 import { analyze } from './index.js';
-import { parseArgs } from './cli-args.js';
+import { parseArgs, GRADE_ORDER } from './cli-args.js';
 import type { SecurityHeaderReport } from './types.js';
 
 const require = createRequire(import.meta.url);
@@ -38,16 +38,19 @@ function printHelp() {
   console.log('  npx @hailbytes/security-headers <url> [options]');
   console.log('');
   console.log(`${B}Options:${R}`);
-  console.log('  --json            Output report as JSON');
-  console.log('  --timeout ms      Fetch timeout in milliseconds (default: 10000)');
-  console.log('  --allow-private   Allow scanning hosts that resolve to private/internal IPs');
-  console.log('  --version         Print version and exit');
-  console.log('  --help            Print this help and exit');
+  console.log('  --json             Output report as JSON');
+  console.log('  --timeout ms       Fetch timeout in milliseconds (default: 10000)');
+  console.log('  --fail-on grade    Exit 1 when grade is at or below this level (default: D)');
+  console.log(`                     Valid grades (best→worst): ${GRADE_ORDER.join(', ')}`);
+  console.log('  --allow-private    Allow scanning hosts that resolve to private/internal IPs');
+  console.log('  --version          Print version and exit');
+  console.log('  --help             Print this help and exit');
   console.log('');
   console.log(`${B}Examples:${R}`);
   console.log('  security-headers https://example.com');
   console.log('  security-headers https://example.com --json');
   console.log('  security-headers https://example.com --timeout 5000');
+  console.log('  security-headers https://staging.example.com --fail-on C');
   console.log('  security-headers https://staging.example.com || echo "Gate failed"');
 }
 
@@ -89,7 +92,7 @@ async function main() {
   }
 
   if (!parsed.url) {
-    console.error('Usage: security-headers <url> [--json] [--timeout ms] [--allow-private] [--help] [--version]');
+    console.error('Usage: security-headers <url> [--json] [--timeout ms] [--fail-on grade] [--allow-private] [--help] [--version]');
     console.error('Run with --help for full usage information.');
     process.exit(1);
   }
@@ -101,7 +104,8 @@ async function main() {
     });
     if (parsed.json) { console.log(JSON.stringify(report, null, 2)); }
     else { printReport(report); }
-    if (report.grade === 'D' || report.grade === 'F') process.exit(1);
+    const threshold = parsed.failOnGrade ?? 'D';
+    if (GRADE_ORDER.indexOf(report.grade) >= GRADE_ORDER.indexOf(threshold)) process.exit(1);
   } catch (err) {
     console.error(`Error: ${(err as Error).message}`);
     process.exit(1);
