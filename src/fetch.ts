@@ -70,7 +70,11 @@ async function assertPublicUrl(url: URL, allowPrivateNetworks: boolean | undefin
 }
 
 export async function fetchHeaders(url: string, options?: FetchOptions): Promise<Record<string, string>> {
-  const timeoutMs = options?.timeoutMs ?? 10000;
+  // Guards direct library callers (not just the CLI, which validates its own
+  // --timeout flag): a NaN/Infinity/non-positive timeoutMs would otherwise
+  // reach setTimeout and fire near-instantly, aborting the request immediately.
+  const rawTimeout = options?.timeoutMs;
+  const timeoutMs = Number.isFinite(rawTimeout) && (rawTimeout as number) > 0 ? (rawTimeout as number) : 10000;
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), timeoutMs);
   try {
