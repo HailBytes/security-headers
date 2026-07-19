@@ -37,10 +37,11 @@ function printHelp() {
   console.log('  npx @hailbytes/security-headers <url> [options]');
   console.log('');
   console.log(`${B}Options:${R}`);
-  console.log('  --json        Output report as JSON');
-  console.log('  --timeout ms  Fetch timeout in milliseconds (default: 10000)');
-  console.log('  --version     Print version and exit');
-  console.log('  --help        Print this help and exit');
+  console.log('  --json            Output report as JSON');
+  console.log('  --timeout ms      Fetch timeout in milliseconds (default: 10000)');
+  console.log('  --allow-private   Allow scanning hosts that resolve to private/internal IPs');
+  console.log('  --version         Print version and exit');
+  console.log('  --help            Print this help and exit');
   console.log('');
   console.log(`${B}Examples:${R}`);
   console.log('  security-headers https://example.com');
@@ -80,16 +81,20 @@ async function main() {
   }
 
   const jsonMode = args.includes('--json');
+  const allowPrivateNetworks = args.includes('--allow-private');
   const timeoutArg = args.find((a, i) => a === '--timeout' && args[i + 1]);
   const timeoutMs = timeoutArg ? parseInt(args[args.indexOf('--timeout') + 1], 10) : undefined;
   const url = args.find(a => !a.startsWith('--') && a !== String(timeoutMs));
   if (!url) {
-    console.error('Usage: security-headers <url> [--json] [--timeout ms] [--help] [--version]');
+    console.error('Usage: security-headers <url> [--json] [--timeout ms] [--allow-private] [--help] [--version]');
     console.error('Run with --help for full usage information.');
     process.exit(1);
   }
   try {
-    const report = await analyze(url, timeoutMs !== undefined ? { timeoutMs } : undefined);
+    const report = await analyze(url, {
+      ...(timeoutMs !== undefined ? { timeoutMs } : {}),
+      ...(allowPrivateNetworks ? { allowPrivateNetworks } : {}),
+    });
     if (jsonMode) { console.log(JSON.stringify(report, null, 2)); }
     else { printReport(report); }
     if (report.grade === 'D' || report.grade === 'F') process.exit(1);
