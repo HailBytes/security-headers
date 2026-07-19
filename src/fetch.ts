@@ -69,7 +69,13 @@ async function assertPublicUrl(url: URL, allowPrivateNetworks: boolean | undefin
   }
 }
 
-export async function fetchHeaders(url: string, options?: FetchOptions): Promise<Record<string, string>> {
+export interface FetchHeadersResult {
+  headers: Record<string, string>;
+  /** The URL the headers actually came from, after following any redirects. */
+  finalUrl: string;
+}
+
+export async function fetchHeadersWithMeta(url: string, options?: FetchOptions): Promise<FetchHeadersResult> {
   // Guards direct library callers (not just the CLI, which validates its own
   // --timeout flag): a NaN/Infinity/non-positive timeoutMs would otherwise
   // reach setTimeout and fire near-instantly, aborting the request immediately.
@@ -97,9 +103,13 @@ export async function fetchHeaders(url: string, options?: FetchOptions): Promise
       const headers: Record<string, string> = {};
       res.headers.forEach((value, key) => { headers[key.toLowerCase()] = value; });
       try { await res.body?.cancel(); } catch { /* body may be absent or already closed */ }
-      return headers;
+      return { headers, finalUrl: current.toString() };
     }
   } finally {
     clearTimeout(timer);
   }
+}
+
+export async function fetchHeaders(url: string, options?: FetchOptions): Promise<Record<string, string>> {
+  return (await fetchHeadersWithMeta(url, options)).headers;
 }

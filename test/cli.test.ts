@@ -6,8 +6,15 @@ import { vi, describe, it, expect, afterEach } from 'vitest';
 const fetchHeadersMock = vi.fn();
 
 vi.mock('../src/fetch.js', () => ({
-  fetchHeaders: fetchHeadersMock,
+  fetchHeadersWithMeta: fetchHeadersMock,
 }));
+
+// index.ts only sets report.finalUrl when it differs from the requested URL,
+// so defaulting finalUrl to the same URL keeps existing assertions (which
+// don't care about redirects) unaffected.
+function withMeta(headers: Record<string, string>, finalUrl = 'https://example.com') {
+  return { headers, finalUrl };
+}
 
 // A fully-configured set of headers → A+ (90/100, 90%)
 const A_PLUS_HEADERS: Record<string, string> = {
@@ -87,26 +94,26 @@ describe('cli', () => {
   });
 
   it('exits 0 and prints a report for an A+ site', async () => {
-    fetchHeadersMock.mockResolvedValueOnce(A_PLUS_HEADERS);
+    fetchHeadersMock.mockResolvedValueOnce(withMeta(A_PLUS_HEADERS));
     const { exitCode, stdout } = await runCli(['https://example.com']);
     expect(exitCode).toBe(0);
     expect(stdout).toContain('Security Headers Report');
   });
 
   it('exits 1 for an F-grade site — CI gate enforced', async () => {
-    fetchHeadersMock.mockResolvedValueOnce({});
+    fetchHeadersMock.mockResolvedValueOnce(withMeta({}, 'https://bad.example.com'));
     const { exitCode } = await runCli(['https://bad.example.com']);
     expect(exitCode).toBe(1);
   });
 
   it('exits 1 for a D-grade site — CI gate enforced', async () => {
-    fetchHeadersMock.mockResolvedValueOnce(D_HEADERS);
+    fetchHeadersMock.mockResolvedValueOnce(withMeta(D_HEADERS, 'https://d-grade.example.com'));
     const { exitCode } = await runCli(['https://d-grade.example.com']);
     expect(exitCode).toBe(1);
   });
 
   it('--json emits valid JSON with grade, score, and headers array', async () => {
-    fetchHeadersMock.mockResolvedValueOnce(A_PLUS_HEADERS);
+    fetchHeadersMock.mockResolvedValueOnce(withMeta(A_PLUS_HEADERS));
     const { stdout, exitCode } = await runCli(['https://example.com', '--json']);
     expect(exitCode).toBe(0);
     const report = JSON.parse(stdout);
@@ -116,10 +123,17 @@ describe('cli', () => {
   });
 
   it('--json includes the url field', async () => {
-    fetchHeadersMock.mockResolvedValueOnce(A_PLUS_HEADERS);
+    fetchHeadersMock.mockResolvedValueOnce(withMeta(A_PLUS_HEADERS));
     const { stdout } = await runCli(['https://example.com', '--json']);
     const report = JSON.parse(stdout);
     expect(report.url).toBe('https://example.com');
+  });
+
+  it('--json includes finalUrl when the scan followed a redirect', async () => {
+    fetchHeadersMock.mockResolvedValueOnce(withMeta(A_PLUS_HEADERS, 'https://example.com/final'));
+    const { stdout } = await runCli(['https://example.com', '--json']);
+    const report = JSON.parse(stdout);
+    expect(report.finalUrl).toBe('https://example.com/final');
   });
 
   it('--version prints a semver string and exits 0', async () => {
@@ -159,8 +173,8 @@ describe('cli', () => {
     expect(stderr).toContain('ECONNREFUSED');
   });
 
-  it('--timeout passes the parsed integer value to fetchHeaders', async () => {
-    fetchHeadersMock.mockResolvedValueOnce(A_PLUS_HEADERS);
+  it('--timeout passes the parsed integer value to fetchHeadersWithMeta', async () => {
+    fetchHeadersMock.mockResolvedValueOnce(withMeta(A_PLUS_HEADERS));
     await runCli(['https://example.com', '--timeout', '3000']);
     expect(fetchHeadersMock).toHaveBeenCalledWith('https://example.com', { timeoutMs: 3000 });
   });
