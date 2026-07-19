@@ -124,7 +124,7 @@ interface HeaderFinding {
 | Header | Max Points | Key Checks |
 |---|---|---|
 | Strict-Transport-Security | 20 | max-age ≥ 1 year, includeSubDomains, preload |
-| Content-Security-Policy | 30 | presence, no unsafe-inline/eval, no wildcards, form-action set |
+| Content-Security-Policy | 30 | presence, no unsafe-inline/eval, no wildcards, form-action/base-uri/object-src fallback set |
 | X-Frame-Options | 15 | DENY or SAMEORIGIN (or CSP frame-ancestors) |
 | X-Content-Type-Options | 10 | nosniff |
 | Referrer-Policy | 10 | strict values only |

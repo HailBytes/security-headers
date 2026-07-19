@@ -165,9 +165,10 @@ describe('checkCSP', () => {
   });
 
   it("does not penalize 'unsafe-inline' when 'strict-dynamic' + nonce present", () => {
+    // 20 - 2 (no default-src or object-src) = 18
     const r = checkCSP({ 'content-security-policy': "script-src 'strict-dynamic' 'nonce-abc123' 'unsafe-inline' https://example.com; form-action 'self'; base-uri 'none'" });
     expect(r.findings.some(f => f.includes('unsafe-inline'))).toBe(false);
-    expect(r.score).toBe(20);
+    expect(r.score).toBe(18);
   });
 
   it("still penalizes 'unsafe-inline' when 'strict-dynamic' present without nonce/hash", () => {
@@ -278,6 +279,24 @@ describe('checkCSP', () => {
   it("base-uri 'self' satisfies the base-uri check", () => {
     const r = checkCSP({ 'content-security-policy': "default-src 'self'; form-action 'self'; base-uri 'self'" });
     expect(r.findings.some(f => /base-uri/i.test(f))).toBe(false);
+    expect(r.score).toBe(20);
+  });
+
+  it('flags a policy with neither default-src nor object-src', () => {
+    const r = checkCSP({ 'content-security-policy': "script-src 'self'; form-action 'self'; base-uri 'self'" });
+    expect(r.findings.some(f => /object-src/i.test(f))).toBe(true);
+    expect(r.status).toBe('warning');
+    expect(r.score).toBe(18);
+  });
+
+  it('default-src alone satisfies the object-src fallback check', () => {
+    const r = checkCSP({ 'content-security-policy': "default-src 'self'; form-action 'self'; base-uri 'self'" });
+    expect(r.findings.some(f => /object-src/i.test(f))).toBe(false);
+  });
+
+  it("object-src 'none' satisfies the check even without default-src", () => {
+    const r = checkCSP({ 'content-security-policy': "script-src 'self'; object-src 'none'; form-action 'self'; base-uri 'self'" });
+    expect(r.findings.some(f => /object-src/i.test(f))).toBe(false);
     expect(r.score).toBe(20);
   });
 });
