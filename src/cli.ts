@@ -38,10 +38,11 @@ function printHelp() {
   console.log('  npx @hailbytes/security-headers <url> [options]');
   console.log('');
   console.log(`${B}Options:${R}`);
-  console.log('  --json        Output report as JSON');
-  console.log('  --timeout ms  Fetch timeout in milliseconds (default: 10000)');
-  console.log('  --version     Print version and exit');
-  console.log('  --help        Print this help and exit');
+  console.log('  --json            Output report as JSON');
+  console.log('  --timeout ms      Fetch timeout in milliseconds (default: 10000)');
+  console.log('  --allow-private   Allow scanning hosts that resolve to private/internal IPs');
+  console.log('  --version         Print version and exit');
+  console.log('  --help            Print this help and exit');
   console.log('');
   console.log(`${B}Examples:${R}`);
   console.log('  security-headers https://example.com');
@@ -88,12 +89,16 @@ async function main() {
   }
 
   if (!parsed.url) {
-    console.error('Usage: security-headers <url> [--json] [--timeout ms] [--help] [--version]');
+    console.error('Usage: security-headers <url> [--json] [--timeout ms] [--allow-private] [--help] [--version]');
     console.error('Run with --help for full usage information.');
     process.exit(1);
   }
+  const allowPrivateNetworks = args.includes('--allow-private');
   try {
-    const report = await analyze(parsed.url, parsed.timeoutMs !== undefined ? { timeoutMs: parsed.timeoutMs } : undefined);
+    const report = await analyze(parsed.url, {
+      ...(parsed.timeoutMs !== undefined ? { timeoutMs: parsed.timeoutMs } : {}),
+      ...(allowPrivateNetworks ? { allowPrivateNetworks } : {}),
+    });
     if (parsed.json) { console.log(JSON.stringify(report, null, 2)); }
     else { printReport(report); }
     if (report.grade === 'D' || report.grade === 'F') process.exit(1);
