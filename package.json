@@ -1,6 +1,6 @@
 {
   "name": "@hailbytes/security-headers",
-  "version": "1.0.1",
+  "version": "1.0.13",
   "description": "Analyze HTTP security headers for your web application. A-F grading, per-header findings, and remediation steps — as a library or CLI.",
   "type": "module",
   "license": "MIT",
@@ -51,10 +51,10 @@
     "prepublishOnly": "npm run build"
   },
   "devDependencies": {
-    "@types/node": "^20.0.0",
-    "@vitest/coverage-v8": "^4.1.7",
+    "@types/node": "^26.1.1",
+    "@vitest/coverage-v8": "^4.1.10",
     "typescript": "^5.4.0",
-    "vitest": "^4.1.7"
+    "vitest": "^4.1.10"
   },
   "engines": {
     "node": ">=18.0.0"

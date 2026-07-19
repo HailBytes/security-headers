@@ -4,6 +4,9 @@ on:
   push:
     tags:
       - 'v*'
+  workflow_run:
+    workflows: ["Auto Tag"]
+    types: [completed]
   workflow_dispatch:
 
 permissions:
@@ -14,8 +17,12 @@ jobs:
   publish:
     name: Build & Publish
     runs-on: ubuntu-latest
+    if: github.event_name != 'workflow_run' || github.event.workflow_run.conclusion == 'success'
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          ref: ${{ github.event.workflow_run.head_sha || github.sha }}
 
       - uses: actions/setup-node@v4
         with:
@@ -28,10 +35,18 @@ jobs:
 
       - name: Set version from tag
         run: |
-          # Use tag version if triggered by tag push, otherwise use package.json as-is
+          # Use tag version if triggered by tag push; otherwise (Auto Tag's
+          # workflow_run) resolve the newest v* tag pointing at this commit,
+          # since tags pushed with the default GITHUB_TOKEN don't fire `push` events.
           if [[ "$GITHUB_REF" == refs/tags/v* ]]; then
             TAG_VERSION="${GITHUB_REF#refs/tags/v}"
+          else
+            TAG_VERSION=$(git tag -l 'v*' --sort=-version:refname --points-at HEAD | head -1 | sed 's/^v//')
+          fi
+          if [ -n "$TAG_VERSION" ]; then
             npm version "$TAG_VERSION" --no-git-tag-version
+          else
+            echo "::warning::No matching v* tag found at this commit; publishing package.json version as-is"
           fi
 
       - name: Type-check
