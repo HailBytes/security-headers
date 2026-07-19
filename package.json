@@ -1,6 +1,6 @@
 {
   "name": "@hailbytes/security-headers",
-  "version": "1.0.11",
+  "version": "1.0.12",
   "description": "Analyze HTTP security headers for your web application. A-F grading, per-header findings, and remediation steps — as a library or CLI.",
   "type": "module",
   "license": "MIT",
