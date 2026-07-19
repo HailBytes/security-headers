@@ -324,8 +324,20 @@ describe('checkXFrameOptions', () => {
     expect(r.score).toBe(15);
   });
 
-  it('invalid value returns score 8', () => {
+  it('ALLOW-FROM is ignored by all current browsers and scores 0', () => {
     const r = checkXFrameOptions({ 'x-frame-options': 'ALLOW-FROM https://example.com' });
+    expect(r.score).toBe(0);
+    expect(r.status).toBe('warning');
+    expect(r.findings.some(f => /ignored by all current browsers/i.test(f))).toBe(true);
+  });
+
+  it('ALLOW-FROM matching is case-insensitive', () => {
+    const r = checkXFrameOptions({ 'x-frame-options': 'allow-from https://example.com' });
+    expect(r.score).toBe(0);
+  });
+
+  it('other invalid value returns score 8', () => {
+    const r = checkXFrameOptions({ 'x-frame-options': 'garbage-value' });
     expect(r.score).toBe(8);
     expect(r.status).toBe('warning');
   });
