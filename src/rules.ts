@@ -94,12 +94,11 @@ export function checkCSP(headers: RawHeaders): HeaderFinding {
   const findings: string[] = [];
   const recommendations: string[] = [];
 
-  // 'unsafe-inline' is ignored by browsers that support 'strict-dynamic' when a
-  // nonce/hash is also present — that combination is the recommended Strict CSP
-  // pattern (the 'unsafe-inline' is a backwards-compat fallback), so don't penalize it.
-  const hasStrictDynamic = /'strict-dynamic'/i.test(raw);
+  // Per CSP2, a nonce or hash source in the policy causes 'unsafe-inline' to be
+  // ignored by all modern browsers — it becomes a harmless backwards-compat
+  // fallback for CSP1-only browsers. Don't penalize it in that case.
   const hasNonceOrHash = /'nonce-[^']+'/i.test(raw) || /'sha(?:256|384|512)-[^']+'/i.test(raw);
-  if (/'unsafe-inline'/i.test(raw) && !(hasStrictDynamic && hasNonceOrHash)) {
+  if (/'unsafe-inline'/i.test(raw) && !hasNonceOrHash) {
     score -= 5;
     findings.push("'unsafe-inline' weakens XSS protection");
     recommendations.push("Remove 'unsafe-inline'; use nonces or hashes instead");
