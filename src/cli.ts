@@ -58,6 +58,7 @@ function printReport(r: SecurityHeaderReport) {
   const gc = GRADE_COLOR[r.grade] ?? '';
   console.log(`\n${B}Security Headers Report${R}`);
   if (r.url) console.log(`${D}${r.url}${R}`);
+  if (r.finalUrl) console.log(`${YLW}Redirected to: ${r.finalUrl}${R}`);
   console.log(`${D}Analyzed: ${r.analyzedAt}${R}\n`);
   console.log(`Grade: ${B}${gc}${r.grade}${R}   Score: ${r.score}/${r.maxScore} (${r.percentage}%)\n`);
   console.log('\u2500'.repeat(60));

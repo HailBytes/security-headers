@@ -5,7 +5,7 @@ vi.mock('node:dns/promises', () => ({
 }));
 
 import { lookup } from 'node:dns/promises';
-import { fetchHeaders } from '../src/fetch.js';
+import { fetchHeaders, fetchHeadersWithMeta } from '../src/fetch.js';
 
 function fakeResponse(status: number, headers: Record<string, string>) {
   return {
@@ -89,6 +89,25 @@ describe('fetchHeaders', () => {
     const headers = await fetchHeaders('https://example.com/start');
     expect(headers['x-frame-options']).toBe('DENY');
     expect(fetch).toHaveBeenCalledTimes(2);
+  });
+
+  it('fetchHeadersWithMeta reports the post-redirect URL', async () => {
+    vi.mocked(lookup).mockResolvedValue([{ address: '93.184.216.34', family: 4 }] as never);
+    vi.mocked(fetch)
+      .mockResolvedValueOnce(fakeResponse(301, { location: 'https://example.com/final' }) as never)
+      .mockResolvedValueOnce(fakeResponse(200, { 'x-frame-options': 'DENY' }) as never);
+
+    const result = await fetchHeadersWithMeta('https://example.com/start');
+    expect(result.headers['x-frame-options']).toBe('DENY');
+    expect(result.finalUrl).toBe('https://example.com/final');
+  });
+
+  it('fetchHeadersWithMeta reports the original URL as finalUrl when there is no redirect', async () => {
+    vi.mocked(lookup).mockResolvedValue([{ address: '93.184.216.34', family: 4 }] as never);
+    vi.mocked(fetch).mockResolvedValueOnce(fakeResponse(200, { 'x-frame-options': 'DENY' }) as never);
+
+    const result = await fetchHeadersWithMeta('https://example.com/start');
+    expect(result.finalUrl).toBe('https://example.com/start');
   });
 
   it('throws after exceeding the redirect limit', async () => {

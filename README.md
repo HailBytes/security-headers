@@ -90,6 +90,7 @@ for (const h of report.headers) {
 ```ts
 interface SecurityHeaderReport {
   url?: string;
+  finalUrl?: string;        // set only if the scan followed a redirect away from `url`
   grade: 'A+' | 'A' | 'B' | 'C' | 'D' | 'F';
   score: number;
   maxScore: number;
