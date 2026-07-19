@@ -214,6 +214,23 @@ describe('checkCSP', () => {
     expect(r.findings.some(f => /Wildcard or bare-scheme/i.test(f))).toBe(false);
   });
 
+  it('detects wildcard in object-src', () => {
+    const r = checkCSP({ 'content-security-policy': "default-src 'self'; form-action 'self'; base-uri 'self'; object-src *" });
+    expect(r.findings.some(f => /Wildcard.*object-src/i.test(f))).toBe(true);
+    expect(r.score).toBeLessThan(20);
+  });
+
+  it('detects bare scheme in object-src', () => {
+    const r = checkCSP({ 'content-security-policy': "default-src 'self'; form-action 'self'; base-uri 'self'; object-src https:" });
+    expect(r.findings.some(f => /Wildcard or bare-scheme/i.test(f))).toBe(true);
+  });
+
+  it("does not flag restrictive object-src 'none'", () => {
+    const r = checkCSP({ 'content-security-policy': "default-src 'self'; form-action 'self'; base-uri 'self'; object-src 'none'" });
+    expect(r.findings.some(f => /object-src/i.test(f))).toBe(false);
+    expect(r.score).toBe(20);
+  });
+
   it('clean CSP returns score 20', () => {
     const r = checkCSP({ 'content-security-policy': "default-src 'self'; form-action 'self'; base-uri 'self'" });
     expect(r.score).toBe(20);
