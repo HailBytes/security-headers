@@ -39,7 +39,15 @@ npx @hailbytes/security-headers https://example.com --json
 
 # Use as a CI gate (exits 1 on grade D or F)
 npx @hailbytes/security-headers https://staging.example.com || echo "Security headers gate failed"
+
+# Use a stricter CI gate threshold (exits 1 on grade C or below)
+npx @hailbytes/security-headers https://staging.example.com --fail-on C
+
+# Scan an internal/local target (disabled by default, see Security below)
+npx @hailbytes/security-headers http://localhost:3000 --allow-private
 ```
+
+`--fail-on <grade>` sets the CI-gate threshold — the CLI exits 1 when the report's grade is at or below the given grade (best→worst: `A+`, `A`, `B`, `C`, `D`, `F`). Defaults to `D`, matching the exit-1-on-D-or-F behavior above.
 
 ### Library — analyze a URL
 
@@ -121,12 +129,20 @@ interface HeaderFinding {
 | Header | Max Points | Key Checks |
 |---|---|---|
 | Strict-Transport-Security | 20 | max-age ≥ 1 year, includeSubDomains, preload |
-| Content-Security-Policy | 30 | presence, no unsafe-inline/eval, no wildcards, form-action set |
+| Content-Security-Policy | 30 | presence, no unsafe-inline/eval, no wildcards, form-action/base-uri/object-src fallback set |
 | X-Frame-Options | 15 | DENY or SAMEORIGIN (or CSP frame-ancestors) |
 | X-Content-Type-Options | 10 | nosniff |
 | Referrer-Policy | 10 | strict values only |
 | Permissions-Policy | 10 | presence |
 | Cross-Origin Policies | 5 | COEP, COOP, CORP |
+
+---
+
+## Security
+
+`analyze(url)` / `fetchHeaders(url)` refuse non-`http(s)` schemes and, by default, refuse to fetch hostnames that resolve to loopback, link-local (including the `169.254.169.254` cloud metadata endpoint), or private (RFC1918) addresses — including via a redirect chain, which is validated hop-by-hop rather than trusting only the initial URL. This matters when the URL being scanned comes from an untrusted source (e.g. a customer-supplied target in an ASM pipeline), where an unguarded fetch is an SSRF vector.
+
+For legitimate local/staging use, pass `{ allowPrivateNetworks: true }` (library) or `--allow-private` (CLI) to opt out.
 
 ---
 

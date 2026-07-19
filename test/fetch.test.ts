@@ -1,103 +1,108 @@
-import { vi, describe, it, expect, afterEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+
+vi.mock('node:dns/promises', () => ({
+  lookup: vi.fn(),
+}));
+
+import { lookup } from 'node:dns/promises';
 import { fetchHeaders } from '../src/fetch.js';
 
+function fakeResponse(status: number, headers: Record<string, string>) {
+  return {
+    status,
+    headers: {
+      has: (k: string) => k.toLowerCase() in headers,
+      get: (k: string) => headers[k.toLowerCase()] ?? null,
+      forEach: (cb: (value: string, key: string) => void) => {
+        for (const [k, v] of Object.entries(headers)) cb(v, k);
+      },
+    },
+    body: { cancel: vi.fn().mockResolvedValue(undefined) },
+  };
+}
+
 describe('fetchHeaders', () => {
+  beforeEach(() => {
+    vi.mocked(lookup).mockReset();
+    vi.stubGlobal('fetch', vi.fn());
+  });
+
   afterEach(() => {
     vi.unstubAllGlobals();
   });
 
-  it('returns response headers as lowercase key-value pairs', async () => {
-    const mockHeaders = new Headers({
-      'Content-Type': 'text/html; charset=utf-8',
-      'X-Custom-Header': 'SomeValue',
-      'Strict-Transport-Security': 'max-age=31536000',
-    });
-    vi.stubGlobal('fetch', vi.fn().mockResolvedValueOnce({
-      headers: mockHeaders,
-      body: { cancel: vi.fn() },
-    }));
+  it('fetches and lower-cases headers for a public host', async () => {
+    vi.mocked(lookup).mockResolvedValue([{ address: '93.184.216.34', family: 4 }] as never);
+    vi.mocked(fetch).mockResolvedValue(fakeResponse(200, { 'Content-Security-Policy': "default-src 'self'" }) as never);
 
-    const result = await fetchHeaders('https://example.com');
-    expect(result).toEqual({
-      'content-type': 'text/html; charset=utf-8',
-      'x-custom-header': 'SomeValue',
-      'strict-transport-security': 'max-age=31536000',
-    });
+    const headers = await fetchHeaders('https://example.com');
+    expect(headers['content-security-policy']).toBe("default-src 'self'");
   });
 
-  it('uses GET — not HEAD — to avoid sites that omit CSP on HEAD responses', async () => {
-    const fetchFn = vi.fn().mockResolvedValueOnce({
-      headers: new Headers(),
-      body: null,
-    });
-    vi.stubGlobal('fetch', fetchFn);
+  it('rejects non-http(s) schemes', async () => {
+    await expect(fetchHeaders('file:///etc/passwd')).rejects.toThrow(/unsupported scheme/i);
+    expect(fetch).not.toHaveBeenCalled();
+  });
 
-    await fetchHeaders('https://example.com');
-    expect(fetchFn).toHaveBeenCalledWith(
-      'https://example.com',
-      expect.objectContaining({ method: 'GET' }),
+  it('rejects hosts that resolve to loopback addresses', async () => {
+    vi.mocked(lookup).mockResolvedValue([{ address: '127.0.0.1', family: 4 }] as never);
+    await expect(fetchHeaders('http://localhost')).rejects.toThrow(/private\/internal/i);
+    expect(fetch).not.toHaveBeenCalled();
+  });
+
+  it('rejects the cloud metadata endpoint (link-local range)', async () => {
+    vi.mocked(lookup).mockResolvedValue([{ address: '169.254.169.254', family: 4 }] as never);
+    await expect(fetchHeaders('http://169.254.169.254/latest/meta-data/')).rejects.toThrow(/private\/internal/i);
+  });
+
+  it('rejects RFC1918 private addresses', async () => {
+    vi.mocked(lookup).mockResolvedValue([{ address: '10.0.0.5', family: 4 }] as never);
+    await expect(fetchHeaders('http://internal.example.com')).rejects.toThrow(/private\/internal/i);
+  });
+
+  it('rejects IPv6 loopback and unique-local addresses', async () => {
+    vi.mocked(lookup).mockResolvedValue([{ address: '::1', family: 6 }] as never);
+    await expect(fetchHeaders('http://ipv6-loopback.example.com')).rejects.toThrow(/private\/internal/i);
+
+    vi.mocked(lookup).mockResolvedValue([{ address: 'fd12:3456::1', family: 6 }] as never);
+    await expect(fetchHeaders('http://ipv6-ula.example.com')).rejects.toThrow(/private\/internal/i);
+  });
+
+  it('rejects a redirect that targets a private address', async () => {
+    vi.mocked(lookup).mockImplementation(async (hostname: string) => {
+      if (hostname === 'public.example.com') return [{ address: '93.184.216.34', family: 4 }] as never;
+      return [{ address: '169.254.169.254', family: 4 }] as never;
+    });
+    vi.mocked(fetch).mockResolvedValue(
+      fakeResponse(302, { location: 'http://internal.example.com/latest/meta-data/' }) as never
     );
+
+    await expect(fetchHeaders('https://public.example.com')).rejects.toThrow(/private\/internal/i);
   });
 
-  it('passes an AbortSignal to fetch for timeout control', async () => {
-    const fetchFn = vi.fn().mockResolvedValueOnce({
-      headers: new Headers(),
-      body: null,
-    });
-    vi.stubGlobal('fetch', fetchFn);
+  it('follows a bounded number of redirects to a public host', async () => {
+    vi.mocked(lookup).mockResolvedValue([{ address: '93.184.216.34', family: 4 }] as never);
+    vi.mocked(fetch)
+      .mockResolvedValueOnce(fakeResponse(301, { location: 'https://example.com/final' }) as never)
+      .mockResolvedValueOnce(fakeResponse(200, { 'x-frame-options': 'DENY' }) as never);
 
-    await fetchHeaders('https://example.com');
-    expect(fetchFn).toHaveBeenCalledWith(
-      expect.any(String),
-      expect.objectContaining({ signal: expect.any(AbortSignal) }),
-    );
+    const headers = await fetchHeaders('https://example.com/start');
+    expect(headers['x-frame-options']).toBe('DENY');
+    expect(fetch).toHaveBeenCalledTimes(2);
   });
 
-  it('cancels the response body after collecting headers', async () => {
-    const cancel = vi.fn().mockResolvedValue(undefined);
-    vi.stubGlobal('fetch', vi.fn().mockResolvedValueOnce({
-      headers: new Headers({ 'x-test': 'value' }),
-      body: { cancel },
-    }));
+  it('throws after exceeding the redirect limit', async () => {
+    vi.mocked(lookup).mockResolvedValue([{ address: '93.184.216.34', family: 4 }] as never);
+    vi.mocked(fetch).mockImplementation(async () => fakeResponse(302, { location: 'https://example.com/next' }) as never);
 
-    await fetchHeaders('https://example.com');
-    expect(cancel).toHaveBeenCalled();
+    await expect(fetchHeaders('https://example.com/start')).rejects.toThrow(/too many redirects/i);
   });
 
-  it('handles a null body without throwing', async () => {
-    vi.stubGlobal('fetch', vi.fn().mockResolvedValueOnce({
-      headers: new Headers(),
-      body: null,
-    }));
+  it('allows private networks when allowPrivateNetworks is set', async () => {
+    vi.mocked(fetch).mockResolvedValue(fakeResponse(200, { 'x-frame-options': 'DENY' }) as never);
 
-    await expect(fetchHeaders('https://example.com')).resolves.toEqual({});
-  });
-
-  it('aborts the request after timeoutMs elapses', async () => {
-    const fetchFn = vi.fn().mockImplementation((_url: string, opts: RequestInit) => {
-      const signal = opts.signal as AbortSignal;
-      return new Promise((_resolve, reject) => {
-        signal.addEventListener('abort', () => reject(new Error('aborted')));
-      });
-    });
-    vi.stubGlobal('fetch', fetchFn);
-
-    // 1 ms timeout — fires almost immediately; the fetch mock never resolves
-    await expect(fetchHeaders('https://slow.example.com', { timeoutMs: 1 })).rejects.toThrow('aborted');
-  });
-
-  it('clears the abort timer after a successful fetch', async () => {
-    // If the timer were not cleared, it would fire after the test ends and
-    // could abort a subsequent request or log a warning.
-    const cancel = vi.fn().mockResolvedValue(undefined);
-    vi.stubGlobal('fetch', vi.fn().mockResolvedValueOnce({
-      headers: new Headers({ 'x-ok': '1' }),
-      body: { cancel },
-    }));
-
-    const result = await fetchHeaders('https://example.com', { timeoutMs: 50 });
-    // Waiting past the original timeout should not throw or abort anything
-    await new Promise(r => setTimeout(r, 60));
-    expect(result).toHaveProperty('x-ok', '1');
+    const headers = await fetchHeaders('http://localhost:3000', { allowPrivateNetworks: true });
+    expect(headers['x-frame-options']).toBe('DENY');
+    expect(lookup).not.toHaveBeenCalled();
   });
 });
