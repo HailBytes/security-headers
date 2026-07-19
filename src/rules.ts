@@ -212,7 +212,15 @@ export function checkReferrerPolicy(headers: RawHeaders): HeaderFinding {
   // (path + query) to every cross-origin HTTPS destination. It was the historical
   // browser default precisely because it was the least restrictive option.
   const strongValues = ['no-referrer', 'strict-origin', 'strict-origin-when-cross-origin', 'same-origin'];
-  const isStrong = strongValues.includes(raw.toLowerCase().trim());
+  // Per W3C Referrer Policy spec the header value may be a comma-separated list;
+  // browsers parse left-to-right and use the last token they recognise. Unrecognised
+  // tokens are skipped, so `unsafe-url, strict-origin-when-cross-origin` is effectively
+  // strong. We must apply the same last-recognised-wins logic here.
+  const allValidPolicies = ['no-referrer', 'no-referrer-when-downgrade', 'same-origin', 'origin',
+    'strict-origin', 'origin-when-cross-origin', 'strict-origin-when-cross-origin', 'unsafe-url'];
+  const tokens = raw.toLowerCase().split(',').map(t => t.trim()).filter(Boolean);
+  const effective = [...tokens].reverse().find(t => allValidPolicies.includes(t)) ?? tokens[tokens.length - 1] ?? '';
+  const isStrong = strongValues.includes(effective);
   const score = isStrong ? 10 : 5;
   return { header: 'Referrer-Policy', score, maxScore: 10, status: isStrong ? 'good' : 'warning', raw,
     findings: isStrong ? [] : [`Value '${raw}' may leak referrer information`],

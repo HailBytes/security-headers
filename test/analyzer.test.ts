@@ -426,6 +426,27 @@ describe('checkReferrerPolicy', () => {
     expect(r.score).toBe(5);
     expect(r.status).toBe('warning');
   });
+
+  it('comma-separated list: uses last recognised value (strong wins)', () => {
+    // Servers sometimes send a fallback list for older browsers; browsers use the
+    // last recognised token, so this is effectively strict-origin-when-cross-origin.
+    const r = checkReferrerPolicy({ 'referrer-policy': 'no-referrer-when-downgrade, strict-origin-when-cross-origin' });
+    expect(r.score).toBe(10);
+    expect(r.status).toBe('good');
+  });
+
+  it('comma-separated list: last recognised weak value is not strong', () => {
+    const r = checkReferrerPolicy({ 'referrer-policy': 'strict-origin-when-cross-origin, unsafe-url' });
+    expect(r.score).toBe(5);
+    expect(r.status).toBe('warning');
+  });
+
+  it('comma-separated list: unrecognised trailing token falls back to last recognised', () => {
+    // "future-policy" is not in the spec; browsers ignore it and use strict-origin.
+    const r = checkReferrerPolicy({ 'referrer-policy': 'strict-origin, future-policy' });
+    expect(r.score).toBe(10);
+    expect(r.status).toBe('good');
+  });
 });
 
 describe('checkPermissionsPolicy', () => {
