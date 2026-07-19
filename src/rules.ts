@@ -227,6 +227,24 @@ export function checkReferrerPolicy(headers: RawHeaders): HeaderFinding {
     recommendations: isStrong ? [] : ['Use: strict-origin-when-cross-origin'] };
 }
 
+/**
+ * Returns true when a Permissions-Policy directive is present and restrictive —
+ * i.e. `feature=(...)` with any allowlist (including the empty allowlist `()`
+ * that denies all origins). Returns false when the feature is absent or when
+ * its value is the bare wildcard `*`, which allows every origin.
+ */
+function isPermissionsPolicyFeatureRestricted(policy: string, feature: string): boolean {
+  const lower = policy.toLowerCase();
+  const feat = feature.toLowerCase();
+  const idx = lower.indexOf(feat + '=');
+  if (idx === -1) return false;
+  // Reject a partial suffix match (e.g. "notcamera=()").
+  if (idx > 0 && /[\w-]/.test(lower[idx - 1])) return false;
+  const rest = lower.slice(idx + feat.length + 1).trimStart();
+  if (rest.startsWith('*')) return false; // `feature=*` — allow-all, not restrictive
+  return rest.startsWith('(');            // `feature=(...)` — any allowlist is restrictive
+}
+
 export function checkPermissionsPolicy(headers: RawHeaders): HeaderFinding {
   const raw = getHeader(headers, 'permissions-policy') ?? getHeader(headers, 'feature-policy');
   if (!raw) return {
@@ -234,10 +252,9 @@ export function checkPermissionsPolicy(headers: RawHeaders): HeaderFinding {
     findings: ['Permissions-Policy not set — browser features are not restricted'],
     recommendations: ['Add Permissions-Policy: camera=(), microphone=(), geolocation=()'],
   };
-  const lc = raw.toLowerCase();
-  const hasCam = lc.includes("camera=()");
-  const hasMic = lc.includes("microphone=()");
-  const hasGeo = lc.includes("geolocation=()");
+  const hasCam = isPermissionsPolicyFeatureRestricted(raw, 'camera');
+  const hasMic = isPermissionsPolicyFeatureRestricted(raw, 'microphone');
+  const hasGeo = isPermissionsPolicyFeatureRestricted(raw, 'geolocation');
   const score = (hasCam && hasMic && hasGeo) ? 10 : 5;
   const isGood = score === 10;
   return {

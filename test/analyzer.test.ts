@@ -498,6 +498,30 @@ describe('checkPermissionsPolicy', () => {
     const r = checkPermissionsPolicy({ 'Permissions-Policy': 'camera=(), microphone=(), geolocation=()' });
     expect(r.score).toBe(10);
   });
+
+  it('camera=(self) is restrictive — not all deny-all forms are required', () => {
+    const r = checkPermissionsPolicy({ 'permissions-policy': 'camera=(self), microphone=(self), geolocation=()' });
+    expect(r.score).toBe(10);
+    expect(r.status).toBe('good');
+  });
+
+  it('camera=(https://example.com) is restrictive', () => {
+    const r = checkPermissionsPolicy({ 'permissions-policy': 'camera=(https://example.com), microphone=(), geolocation=()' });
+    expect(r.score).toBe(10);
+    expect(r.status).toBe('good');
+  });
+
+  it('camera=* is permissive — does not count as restricted', () => {
+    const r = checkPermissionsPolicy({ 'permissions-policy': 'camera=*, microphone=(), geolocation=()' });
+    expect(r.score).toBe(5);
+    expect(r.status).toBe('warning');
+  });
+
+  it('partial suffix match (notcamera) is not treated as camera', () => {
+    const r = checkPermissionsPolicy({ 'permissions-policy': 'notcamera=(), microphone=(), geolocation=()' });
+    expect(r.score).toBe(5);
+    expect(r.status).toBe('warning');
+  });
 });
 
 describe('checkCrossOriginPolicies', () => {
