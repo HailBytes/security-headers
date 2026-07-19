@@ -39,6 +39,9 @@ npx @hailbytes/security-headers https://example.com --json
 
 # Use as a CI gate (exits 1 on grade D or F)
 npx @hailbytes/security-headers https://staging.example.com || echo "Security headers gate failed"
+
+# Scan an internal/local target (disabled by default, see Security below)
+npx @hailbytes/security-headers http://localhost:3000 --allow-private
 ```
 
 ### Library — analyze a URL
@@ -127,6 +130,14 @@ interface HeaderFinding {
 | Referrer-Policy | 10 | strict values only |
 | Permissions-Policy | 10 | presence |
 | Cross-Origin Policies | 5 | COEP, COOP, CORP |
+
+---
+
+## Security
+
+`analyze(url)` / `fetchHeaders(url)` refuse non-`http(s)` schemes and, by default, refuse to fetch hostnames that resolve to loopback, link-local (including the `169.254.169.254` cloud metadata endpoint), or private (RFC1918) addresses — including via a redirect chain, which is validated hop-by-hop rather than trusting only the initial URL. This matters when the URL being scanned comes from an untrusted source (e.g. a customer-supplied target in an ASM pipeline), where an unguarded fetch is an SSRF vector.
+
+For legitimate local/staging use, pass `{ allowPrivateNetworks: true }` (library) or `--allow-private` (CLI) to opt out.
 
 ---
 
