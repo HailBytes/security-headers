@@ -1,5 +1,5 @@
 import type { SecurityHeaderReport, Grade } from './types.js';
-import { checkHSTS, checkCSP, checkXFrameOptions, checkXContentTypeOptions, checkReferrerPolicy, checkPermissionsPolicy, checkCrossOriginPolicies } from './rules.js';
+import { checkHSTS, checkCSP, checkXFrameOptions, checkXContentTypeOptions, checkReferrerPolicy, checkPermissionsPolicy, checkCrossOriginPolicies, checkSetCookie } from './rules.js';
 
 function toGrade(pct: number): Grade {
   if (pct >= 90) return 'A+';
@@ -19,6 +19,7 @@ export function analyzeHeaders(headers: Record<string, string>, url?: string): S
     checkReferrerPolicy(headers),
     checkPermissionsPolicy(headers),
     checkCrossOriginPolicies(headers),
+    checkSetCookie(headers),
   ];
   const score = checks.reduce((s, c) => s + c.score, 0);
   const maxScore = checks.reduce((s, c) => s + c.maxScore, 0);

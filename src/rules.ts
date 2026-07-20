@@ -294,6 +294,78 @@ export function checkPermissionsPolicy(headers: RawHeaders): HeaderFinding {
   };
 }
 
+/**
+ * Set-Cookie values are joined with '\n' by fetchHeadersWithMeta (see fetch.ts)
+ * since commas can legitimately appear inside a single cookie, e.g. the
+ * Expires attribute ("Expires=Wed, 21 Oct 2015 07:28:00 GMT").
+ */
+function splitSetCookieHeader(raw: string): string[] {
+  return raw.split('\n').map(c => c.trim()).filter(Boolean);
+}
+
+function parseCookieAttributes(cookie: string): { name: string; secure: boolean; httpOnly: boolean; sameSite?: string } {
+  const parts = cookie.split(';').map(p => p.trim());
+  const name = (parts.shift() ?? '').split('=')[0].trim() || '(unnamed)';
+  let secure = false;
+  let httpOnly = false;
+  let sameSite: string | undefined;
+  for (const part of parts) {
+    const eq = part.indexOf('=');
+    const key = (eq === -1 ? part : part.slice(0, eq)).trim().toLowerCase();
+    const val = eq === -1 ? '' : part.slice(eq + 1).trim().toLowerCase();
+    if (key === 'secure') secure = true;
+    else if (key === 'httponly') httpOnly = true;
+    else if (key === 'samesite') sameSite = val;
+  }
+  return { name, secure, httpOnly, sameSite };
+}
+
+export function checkSetCookie(headers: RawHeaders): HeaderFinding {
+  const raw = getHeader(headers, 'set-cookie');
+  // Not every response sets cookies — absence is not a security defect, so it
+  // earns full credit rather than being penalized like a missing security header.
+  if (!raw) {
+    return { header: 'Set-Cookie', score: 10, maxScore: 10, status: 'good', findings: [], recommendations: [] };
+  }
+
+  const cookies = splitSetCookieHeader(raw);
+  const findings: string[] = [];
+  const recommendations: string[] = [];
+  let worstDeduction = 0;
+
+  for (const cookie of cookies) {
+    const { name, secure, httpOnly, sameSite } = parseCookieAttributes(cookie);
+    let deduction = 0;
+    if (!secure) {
+      deduction += 4;
+      findings.push(`Cookie '${name}' missing Secure — can be transmitted over plain HTTP`);
+      recommendations.push(`Add Secure to cookie '${name}'`);
+    }
+    if (!httpOnly) {
+      deduction += 3;
+      findings.push(`Cookie '${name}' missing HttpOnly — readable by JavaScript (XSS risk)`);
+      recommendations.push(`Add HttpOnly to cookie '${name}'`);
+    }
+    if (sameSite === 'none' && !secure) {
+      // Per spec, SameSite=None requires Secure — browsers reject the cookie outright.
+      deduction += 3;
+      findings.push(`Cookie '${name}' sets SameSite=None without Secure — invalid combination, browsers will reject this cookie`);
+      recommendations.push(`Add Secure, or use SameSite=Lax/Strict, for cookie '${name}'`);
+    } else if (sameSite !== 'strict' && sameSite !== 'lax') {
+      deduction += 3;
+      findings.push(`Cookie '${name}' missing a restrictive SameSite attribute — vulnerable to CSRF`);
+      recommendations.push(`Add SameSite=Strict or SameSite=Lax to cookie '${name}'`);
+    }
+    worstDeduction = Math.max(worstDeduction, deduction);
+  }
+
+  const score = Math.max(0, 10 - worstDeduction);
+  return {
+    header: 'Set-Cookie', score, maxScore: 10, status: score === 10 ? 'good' : 'warning', raw,
+    findings, recommendations,
+  };
+}
+
 export function checkCrossOriginPolicies(headers: RawHeaders): HeaderFinding {
   const coep = getHeader(headers, 'cross-origin-embedder-policy');
   const coop = getHeader(headers, 'cross-origin-opener-policy');

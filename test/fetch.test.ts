@@ -7,7 +7,7 @@ vi.mock('node:dns/promises', () => ({
 import { lookup } from 'node:dns/promises';
 import { fetchHeaders, fetchHeadersWithMeta } from '../src/fetch.js';
 
-function fakeResponse(status: number, headers: Record<string, string>) {
+function fakeResponse(status: number, headers: Record<string, string>, setCookies: string[] = []) {
   return {
     status,
     headers: {
@@ -15,7 +15,11 @@ function fakeResponse(status: number, headers: Record<string, string>) {
       get: (k: string) => headers[k.toLowerCase()] ?? null,
       forEach: (cb: (value: string, key: string) => void) => {
         for (const [k, v] of Object.entries(headers)) cb(v, k);
+        // Mirrors the real Fetch API/undici: Headers#forEach yields one 'set-cookie'
+        // entry per cookie rather than combining them into a single value.
+        for (const cookie of setCookies) cb(cookie, 'set-cookie');
       },
+      getSetCookie: () => setCookies,
     },
     body: { cancel: vi.fn().mockResolvedValue(undefined) },
   };
@@ -115,6 +119,16 @@ describe('fetchHeaders', () => {
     vi.mocked(fetch).mockImplementation(async () => fakeResponse(302, { location: 'https://example.com/next' }) as never);
 
     await expect(fetchHeaders('https://example.com/start')).rejects.toThrow(/too many redirects/i);
+  });
+
+  it('preserves multiple Set-Cookie headers instead of collapsing to the last one', async () => {
+    vi.mocked(lookup).mockResolvedValue([{ address: '93.184.216.34', family: 4 }] as never);
+    vi.mocked(fetch).mockResolvedValue(
+      fakeResponse(200, {}, ['a=1; Path=/', 'b=2; Path=/']) as never
+    );
+
+    const headers = await fetchHeaders('https://example.com');
+    expect(headers['set-cookie']).toBe('a=1; Path=/\nb=2; Path=/');
   });
 
   it('allows private networks when allowPrivateNetworks is set', async () => {
