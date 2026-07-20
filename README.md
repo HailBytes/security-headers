@@ -12,7 +12,7 @@
 
 ## What it does
 
-Fetches (or accepts raw header objects) and grades 7 security header categories — HSTS, CSP, X-Frame-Options, X-Content-Type-Options, Referrer-Policy, Permissions-Policy, and Cross-Origin policies. Returns an A+ to F letter grade, a 0–100 percentage score, per-header findings, and specific remediation steps.
+Fetches (or accepts raw header objects) and grades 8 security header categories — HSTS, CSP, X-Frame-Options, X-Content-Type-Options, Referrer-Policy, Permissions-Policy, Cross-Origin policies, and Set-Cookie attributes. Returns an A+ to F letter grade, a 0–100 percentage score, per-header findings, and specific remediation steps.
 
 ---
 
@@ -57,7 +57,7 @@ import { analyze } from '@hailbytes/security-headers';
 const report = await analyze('https://example.com');
 
 console.log(report.grade);       // 'A+' | 'A' | 'B' | 'C' | 'D' | 'F'
-console.log(report.score);       // 0–100
+console.log(report.score);       // 0–report.maxScore (raw points)
 console.log(report.percentage);  // 0–100
 console.log(report.headers);     // HeaderFinding[]
 ```
@@ -136,6 +136,7 @@ interface HeaderFinding {
 | Referrer-Policy | 10 | strict values only |
 | Permissions-Policy | 10 | camera, microphone, and geolocation restricted |
 | Cross-Origin Policies | 5 | COEP, COOP, CORP |
+| Set-Cookie | 10 | Secure, HttpOnly, SameSite=Strict/Lax on every cookie (N/A if no cookies are set) |
 
 ---
 

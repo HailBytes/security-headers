@@ -101,7 +101,15 @@ export async function fetchHeadersWithMeta(url: string, options?: FetchOptions):
         continue;
       }
       const headers: Record<string, string> = {};
-      res.headers.forEach((value, key) => { headers[key.toLowerCase()] = value; });
+      res.headers.forEach((value, key) => {
+        // Set-Cookie is excluded here and handled below: a response setting multiple
+        // cookies emits one Set-Cookie entry per cookie, and naively assigning each
+        // into this flat Record would silently drop all but the last one.
+        if (key.toLowerCase() === 'set-cookie') return;
+        headers[key.toLowerCase()] = value;
+      });
+      const setCookies = res.headers.getSetCookie?.() ?? [];
+      if (setCookies.length > 0) headers['set-cookie'] = setCookies.join('\n');
       try { await res.body?.cancel(); } catch { /* body may be absent or already closed */ }
       return { headers, finalUrl: current.toString() };
     }

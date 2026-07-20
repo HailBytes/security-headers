@@ -3,7 +3,7 @@ import { analyzeHeaders } from '../src/analyzer.js';
 import { analyze } from '../src/index.js';
 import {
   checkHSTS, checkCSP, checkXFrameOptions, checkXContentTypeOptions,
-  checkReferrerPolicy, checkPermissionsPolicy, checkCrossOriginPolicies
+  checkReferrerPolicy, checkPermissionsPolicy, checkCrossOriginPolicies, checkSetCookie
 } from '../src/rules.js';
 
 const STRONG_HEADERS = {
@@ -27,9 +27,11 @@ describe('analyzeHeaders', () => {
 
   it('gives grade F for empty headers', () => {
     const r = analyzeHeaders({});
-    expect(r.score).toBe(0);
+    // Set-Cookie is the one category that earns full credit when absent (no
+    // cookies to secure), so it's the sole 'good' entry among all-missing headers.
     expect(r.grade).toBe('F');
-    expect(r.headers.every(h => h.status === 'missing')).toBe(true);
+    expect(r.headers.filter(h => h.header !== 'Set-Cookie').every(h => h.status === 'missing')).toBe(true);
+    expect(r.headers.find(h => h.header === 'Set-Cookie')?.status).toBe('good');
   });
 
   it('header scores sum to total score', () => {
@@ -48,9 +50,9 @@ describe('analyzeHeaders', () => {
     expect(r.analyzedAt).toMatch(/^\d{4}-\d{2}-\d{2}T/);
   });
 
-  it('maxScore is 100', () => {
+  it('maxScore is 110', () => {
     const r = analyzeHeaders({});
-    expect(r.maxScore).toBe(100);
+    expect(r.maxScore).toBe(110);
   });
 });
 
@@ -625,6 +627,56 @@ describe('checkCrossOriginPolicies', () => {
   it('case-insensitive header name matching', () => {
     const r = checkCrossOriginPolicies({ 'Cross-Origin-Opener-Policy': 'same-origin' });
     expect(r.score).toBe(2);
+  });
+});
+
+describe('checkSetCookie', () => {
+  it('no Set-Cookie header earns full credit, not a missing penalty', () => {
+    const r = checkSetCookie({});
+    expect(r.score).toBe(10);
+    expect(r.status).toBe('good');
+    expect(r.findings).toEqual([]);
+  });
+
+  it('cookie with Secure, HttpOnly, and SameSite=Strict is good', () => {
+    const r = checkSetCookie({ 'set-cookie': 'sessionid=abc123; Path=/; Secure; HttpOnly; SameSite=Strict' });
+    expect(r.score).toBe(10);
+    expect(r.status).toBe('good');
+    expect(r.findings).toEqual([]);
+  });
+
+  it('cookie missing all three attributes is flagged with a finding per attribute', () => {
+    const r = checkSetCookie({ 'set-cookie': 'sessionid=abc123; Path=/' });
+    expect(r.status).toBe('warning');
+    expect(r.score).toBe(0);
+    expect(r.findings).toHaveLength(3);
+    expect(r.findings.some(f => f.includes('Secure'))).toBe(true);
+    expect(r.findings.some(f => f.includes('HttpOnly'))).toBe(true);
+    expect(r.findings.some(f => f.includes('SameSite'))).toBe(true);
+  });
+
+  it('SameSite=None without Secure is flagged as an invalid/broken combination', () => {
+    const r = checkSetCookie({ 'set-cookie': 'sessionid=abc123; Path=/; HttpOnly; SameSite=None' });
+    expect(r.status).toBe('warning');
+    expect(r.findings.some(f => f.includes('SameSite=None without Secure'))).toBe(true);
+  });
+
+  it('SameSite=None with Secure is valid but still loses CSRF-protection credit', () => {
+    const r = checkSetCookie({ 'set-cookie': 'sessionid=abc123; Path=/; Secure; HttpOnly; SameSite=None' });
+    expect(r.status).toBe('warning');
+    expect(r.findings.some(f => f.includes('SameSite=None without Secure'))).toBe(false);
+    expect(r.findings.some(f => f.includes('CSRF'))).toBe(true);
+  });
+
+  it('evaluates multiple cookies (newline-joined by fetchHeadersWithMeta) and rolls up the worst case', () => {
+    const raw = [
+      'good=1; Path=/; Secure; HttpOnly; SameSite=Strict',
+      'bad=2; Path=/',
+    ].join('\n');
+    const r = checkSetCookie({ 'set-cookie': raw });
+    expect(r.score).toBe(0);
+    expect(r.findings.some(f => f.includes("'bad'"))).toBe(true);
+    expect(r.findings.some(f => f.includes("'good'"))).toBe(false);
   });
 });
 
