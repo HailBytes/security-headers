@@ -34,12 +34,77 @@ function isPrivateIPv4(ip: string): boolean {
   );
 }
 
+/**
+ * Expands any syntactically valid IPv6 literal (as returned by dns.lookup(),
+ * which isIP() already confirmed to be family 6) into its 8 16-bit groups,
+ * handling "::" compression and a trailing embedded-IPv4 dotted-decimal
+ * suffix (e.g. "::ffff:127.0.0.1", "64:ff9b::169.254.169.254"). Returns null
+ * if the address can't be confidently parsed.
+ */
+function expandIPv6(ip: string): number[] | null {
+  let base = ip.split('%')[0]; // strip zone id, e.g. "fe80::1%eth0"
+
+  let v4Groups: number[] = [];
+  const v4 = base.match(/(\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3})$/);
+  if (v4) {
+    const octets = v4[1].split('.').map(Number);
+    if (octets.length !== 4 || octets.some(o => !Number.isInteger(o) || o < 0 || o > 255)) return null;
+    v4Groups = [(octets[0] << 8) | octets[1], (octets[2] << 8) | octets[3]];
+    base = base.slice(0, -v4[1].length);
+    if (base.endsWith(':') && !base.endsWith('::')) base = base.slice(0, -1);
+  }
+
+  if ((base.match(/::/g) || []).length > 1) return null; // "::" may appear at most once
+
+  const parseHex = (s: string): number | null => (/^[0-9a-f]{1,4}$/.test(s) ? parseInt(s, 16) : null);
+  const toGroups = (s: string): number[] | null => {
+    if (s === '') return [];
+    const nums = s.split(':').map(parseHex);
+    return nums.some(n => n === null) ? null : (nums as number[]);
+  };
+
+  if (base.includes('::')) {
+    const [headStr, tailStr] = base.split('::');
+    const head = toGroups(headStr);
+    const tail = toGroups(tailStr);
+    if (head === null || tail === null) return null;
+    const missing = 8 - (head.length + tail.length + v4Groups.length);
+    if (missing < 0) return null;
+    return [...head, ...Array(missing).fill(0), ...tail, ...v4Groups];
+  }
+  const head = toGroups(base);
+  if (head === null) return null;
+  const groups = [...head, ...v4Groups];
+  return groups.length === 8 ? groups : null;
+}
+
+function groupsToIPv4(hi: number, lo: number): string {
+  return `${hi >> 8}.${hi & 0xff}.${lo >> 8}.${lo & 0xff}`;
+}
+
 function isPrivateIPv6(ip: string): boolean {
   const lc = ip.toLowerCase();
   if (lc === '::' || lc === '::1') return true;
   if (lc.startsWith('fe80:') || lc.startsWith('fc') || lc.startsWith('fd')) return true; // link-local + unique-local (fc00::/7)
-  const mapped = lc.match(/^::ffff:(\d+\.\d+\.\d+\.\d+)$/);
-  if (mapped) return isPrivateIPv4(mapped[1]);
+
+  const g = expandIPv6(lc);
+  if (!g) return true; // couldn't confidently parse an address isIP() already validated — fail closed
+
+  // IPv4-mapped ::ffff:0:0/96 — embeds an IPv4 address in the low 32 bits.
+  if (g[0] === 0 && g[1] === 0 && g[2] === 0 && g[3] === 0 && g[4] === 0 && g[5] === 0xffff) {
+    return isPrivateIPv4(groupsToIPv4(g[6], g[7]));
+  }
+  // NAT64 Well-Known Prefix 64:ff9b::/96 (RFC 6052) — on a NAT64/464XLAT network
+  // (the default IPv6-only mode on several cellular carriers and some cloud
+  // node pools) this is transparently translated and routed to the embedded
+  // IPv4 address, so it must be checked the same as an IPv4-mapped address.
+  if (g[0] === 0x64 && g[1] === 0xff9b && g[2] === 0 && g[3] === 0 && g[4] === 0 && g[5] === 0) {
+    return isPrivateIPv4(groupsToIPv4(g[6], g[7]));
+  }
+  // 6to4 2002::/16 embeds an IPv4 address in the next 32 bits (2002:AABB:CCDD::/48).
+  if (g[0] === 0x2002) {
+    return isPrivateIPv4(groupsToIPv4(g[1], g[2]));
+  }
   return false;
 }
 

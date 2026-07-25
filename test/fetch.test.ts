@@ -72,6 +72,40 @@ describe('fetchHeaders', () => {
     await expect(fetchHeaders('http://ipv6-ula.example.com')).rejects.toThrow(/private\/internal/i);
   });
 
+  it('rejects NAT64-synthesized addresses that embed a private/metadata IPv4 (RFC 6052)', async () => {
+    // 64:ff9b::a9fe:a9fe embeds 169.254.169.254 (cloud metadata endpoint)
+    vi.mocked(lookup).mockResolvedValue([{ address: '64:ff9b::a9fe:a9fe', family: 6 }] as never);
+    await expect(fetchHeaders('http://nat64-metadata.example.com')).rejects.toThrow(/private\/internal/i);
+
+    // Same address, mixed dotted-decimal notation for the embedded IPv4.
+    vi.mocked(lookup).mockResolvedValue([{ address: '64:ff9b::169.254.169.254', family: 6 }] as never);
+    await expect(fetchHeaders('http://nat64-metadata-dotted.example.com')).rejects.toThrow(/private\/internal/i);
+
+    // 64:ff9b::a00:1 embeds 10.0.0.1 (RFC1918)
+    vi.mocked(lookup).mockResolvedValue([{ address: '64:ff9b::a00:1', family: 6 }] as never);
+    await expect(fetchHeaders('http://nat64-rfc1918.example.com')).rejects.toThrow(/private\/internal/i);
+  });
+
+  it('rejects 6to4-synthesized addresses that embed a private IPv4', async () => {
+    // 2002:7f00:1:: embeds 127.0.0.1 (loopback) in the next 32 bits
+    vi.mocked(lookup).mockResolvedValue([{ address: '2002:7f00:1::', family: 6 }] as never);
+    await expect(fetchHeaders('http://6to4-loopback.example.com')).rejects.toThrow(/private\/internal/i);
+  });
+
+  it('allows a NAT64/6to4 address whose embedded IPv4 is public', async () => {
+    // 64:ff9b::5db8:d822 embeds 93.184.216.34 (public)
+    vi.mocked(lookup).mockResolvedValue([{ address: '64:ff9b::5db8:d822', family: 6 }] as never);
+    vi.mocked(fetch).mockResolvedValue(fakeResponse(200, { 'x-frame-options': 'DENY' }) as never);
+    const headers = await fetchHeaders('http://nat64-public.example.com');
+    expect(headers['x-frame-options']).toBe('DENY');
+  });
+
+  it('rejects IPv4-mapped IPv6 addresses in non-dotted (all-hex) notation', async () => {
+    // ::ffff:7f00:1 is the hex-group form of ::ffff:127.0.0.1 (loopback)
+    vi.mocked(lookup).mockResolvedValue([{ address: '::ffff:7f00:1', family: 6 }] as never);
+    await expect(fetchHeaders('http://ipv4-mapped-hex.example.com')).rejects.toThrow(/private\/internal/i);
+  });
+
   it('rejects a redirect that targets a private address', async () => {
     vi.mocked(lookup).mockImplementation(async (hostname: string) => {
       if (hostname === 'public.example.com') return [{ address: '93.184.216.34', family: 4 }] as never;
