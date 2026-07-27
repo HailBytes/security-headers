@@ -258,6 +258,18 @@ describe('checkCSP', () => {
     expect(r.score).toBe(20);
   });
 
+  it('detects wildcard base-uri as permissive, not as satisfying the base-uri check', () => {
+    const r = checkCSP({ 'content-security-policy': "default-src 'self'; form-action 'self'; base-uri *" });
+    expect(r.findings.some(f => /Wildcard.*base-uri/i.test(f))).toBe(true);
+    expect(r.status).toBe('warning');
+    expect(r.score).toBeLessThan(20);
+  });
+
+  it('detects bare scheme (https:) in base-uri as permissive', () => {
+    const r = checkCSP({ 'content-security-policy': "default-src 'self'; form-action 'self'; base-uri https:" });
+    expect(r.findings.some(f => /Wildcard or bare-scheme.*base-uri/i.test(f))).toBe(true);
+  });
+
   it('clean CSP returns score 20', () => {
     const r = checkCSP({ 'content-security-policy': "default-src 'self'; form-action 'self'; base-uri 'self'" });
     expect(r.score).toBe(20);
