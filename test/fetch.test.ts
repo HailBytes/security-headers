@@ -72,6 +72,49 @@ describe('fetchHeaders', () => {
     await expect(fetchHeaders('http://ipv6-ula.example.com')).rejects.toThrow(/private\/internal/i);
   });
 
+  it('rejects NAT64-synthesized addresses that embed a private/metadata IPv4', async () => {
+    // 64:ff9b::a9fe:a9fe embeds 169.254.169.254 (cloud metadata endpoint)
+    vi.mocked(lookup).mockResolvedValue([{ address: '64:ff9b::a9fe:a9fe', family: 6 }] as never);
+    await expect(fetchHeaders('http://nat64-metadata.example.com')).rejects.toThrow(/private\/internal/i);
+
+    // 64:ff9b::7f00:1 embeds 127.0.0.1 (loopback)
+    vi.mocked(lookup).mockResolvedValue([{ address: '64:ff9b::7f00:1', family: 6 }] as never);
+    await expect(fetchHeaders('http://nat64-loopback.example.com')).rejects.toThrow(/private\/internal/i);
+
+    // 64:ff9b::a00:1 embeds 10.0.0.1 (RFC1918)
+    vi.mocked(lookup).mockResolvedValue([{ address: '64:ff9b::a00:1', family: 6 }] as never);
+    await expect(fetchHeaders('http://nat64-rfc1918.example.com')).rejects.toThrow(/private\/internal/i);
+  });
+
+  it('rejects a NAT64 address whose embedded IPv4 gets swallowed into the "::" zero-run', async () => {
+    // 64:ff9b::101 canonically compresses 64:ff9b:0:0:0:0:0:101 (embeds 0.0.1.1,
+    // in the 0.0.0.0/8 "this network" range) — the embedded address's own
+    // leading zero hextet is absorbed into the same "::" run as the prefix's,
+    // which a fixed-shape "two hextets after ::" pattern would miss.
+    vi.mocked(lookup).mockResolvedValue([{ address: '64:ff9b::101', family: 6 }] as never);
+    await expect(fetchHeaders('http://nat64-compressed.example.com')).rejects.toThrow(/private\/internal/i);
+  });
+
+  it('rejects 6to4-synthesized addresses that embed a private/metadata IPv4', async () => {
+    // 2002:a9fe:a9fe:: embeds 169.254.169.254 in the 6to4 (2002::/16) prefix
+    vi.mocked(lookup).mockResolvedValue([{ address: '2002:a9fe:a9fe::', family: 6 }] as never);
+    await expect(fetchHeaders('http://6to4-metadata.example.com')).rejects.toThrow(/private\/internal/i);
+  });
+
+  it('allows a NAT64/6to4 address that embeds a public IPv4', async () => {
+    vi.mocked(lookup).mockResolvedValue([{ address: '64:ff9b::808:808', family: 6 }] as never); // embeds 8.8.8.8
+    vi.mocked(fetch).mockResolvedValue(fakeResponse(200, { 'x-frame-options': 'DENY' }) as never);
+    const headers = await fetchHeaders('http://nat64-public.example.com');
+    expect(headers['x-frame-options']).toBe('DENY');
+  });
+
+  it('allows an ordinary public IPv6 address unrelated to NAT64/6to4', async () => {
+    vi.mocked(lookup).mockResolvedValue([{ address: '2001:4860:4860::8888', family: 6 }] as never); // Google Public DNS
+    vi.mocked(fetch).mockResolvedValue(fakeResponse(200, { 'x-frame-options': 'DENY' }) as never);
+    const headers = await fetchHeaders('http://public-ipv6.example.com');
+    expect(headers['x-frame-options']).toBe('DENY');
+  });
+
   it('rejects a redirect that targets a private address', async () => {
     vi.mocked(lookup).mockImplementation(async (hostname: string) => {
       if (hostname === 'public.example.com') return [{ address: '93.184.216.34', family: 4 }] as never;

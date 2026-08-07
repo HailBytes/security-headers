@@ -34,12 +34,61 @@ function isPrivateIPv4(ip: string): boolean {
   );
 }
 
+/**
+ * Parses a (non-mixed-notation) IPv6 address into its 16 bytes, honoring a
+ * single "::" zero-run compression. Returns null if malformed. Used instead of
+ * a regex so RFC 5952 canonicalization — which can compress zero hextets from
+ * *within* an embedded address, not just the routing prefix — doesn't produce
+ * a form that a fixed-shape pattern would fail to match.
+ */
+function ipv6ToBytes(ip: string): number[] | null {
+  const halves = ip.split('::');
+  if (halves.length > 2) return null;
+  const parseGroups = (s: string): number[] | null => {
+    if (s === '') return [];
+    const out: number[] = [];
+    for (const g of s.split(':')) {
+      if (!/^[0-9a-f]{1,4}$/.test(g)) return null;
+      const n = parseInt(g, 16);
+      out.push((n >> 8) & 0xff, n & 0xff);
+    }
+    return out;
+  };
+  if (halves.length === 1) {
+    const bytes = parseGroups(halves[0]);
+    return bytes && bytes.length === 16 ? bytes : null;
+  }
+  const head = parseGroups(halves[0]);
+  const tail = parseGroups(halves[1]);
+  if (!head || !tail) return null;
+  const missing = 16 - head.length - tail.length;
+  if (missing < 0) return null;
+  return [...head, ...new Array(missing).fill(0), ...tail];
+}
+
+function embeddedIPv4FromPrefix(bytes: number[], prefixBytes: number[]): string | null {
+  if (!prefixBytes.every((b, i) => bytes[i] === b)) return null;
+  return bytes.slice(prefixBytes.length, prefixBytes.length + 4).join('.');
+}
+
 function isPrivateIPv6(ip: string): boolean {
   const lc = ip.toLowerCase();
   if (lc === '::' || lc === '::1') return true;
   if (lc.startsWith('fe80:') || lc.startsWith('fc') || lc.startsWith('fd')) return true; // link-local + unique-local (fc00::/7)
   const mapped = lc.match(/^::ffff:(\d+\.\d+\.\d+\.\d+)$/);
   if (mapped) return isPrivateIPv4(mapped[1]);
+
+  const bytes = ipv6ToBytes(lc);
+  if (bytes) {
+    // NAT64 Well-Known Prefix 64:ff9b::/96 (RFC 6052) and the 6to4 prefix
+    // 2002::/16 both embed a literal IPv4 address that NAT64/464XLAT or 6to4
+    // relay infrastructure transparently routes to — a private/metadata IPv4
+    // reachable through either is reachable through its embedded form too.
+    const nat64 = embeddedIPv4FromPrefix(bytes, [0x00, 0x64, 0xff, 0x9b, 0, 0, 0, 0, 0, 0, 0, 0]);
+    if (nat64) return isPrivateIPv4(nat64);
+    const sixToFour = embeddedIPv4FromPrefix(bytes, [0x20, 0x02]);
+    if (sixToFour) return isPrivateIPv4(sixToFour);
+  }
   return false;
 }
 
